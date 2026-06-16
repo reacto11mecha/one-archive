@@ -148,7 +148,7 @@ async function main() {
   console.log("Memasukkan data Akun Dummy...");
   const dummyUsers = [
     {
-      email: "admin.sma01@mail.com",
+      email: "admin@mail.com",
       password: "smasatuberjaya",
       name: "Kepala TU",
       roleId: "role_admin",

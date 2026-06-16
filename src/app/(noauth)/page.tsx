@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { authClient } from "~/server/better-auth/client";
 
@@ -27,7 +28,8 @@ export default function LoginPage() {
       if (authError) {
         setError(authError.message || "Email atau kata sandi salah.");
       } else {
-        router.push("/");
+        toast.success("Berhasil login!");
+        router.push("/app/dashboard");
         router.refresh();
       }
     } catch (err) {
@@ -44,7 +46,7 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: "/app",
       });
     } catch (err) {
       setError("Gagal masuk dengan Google.");
