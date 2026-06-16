@@ -1,4 +1,5 @@
 import { archiveRouter } from "~/server/api/routers/archive";
+import { systemRouter } from "~/server/api/routers/system";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 
 /**
@@ -8,6 +9,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
  */
 export const appRouter = createTRPCRouter({
   archive: archiveRouter,
+  system: systemRouter,
 });
 
 // export type definition of API

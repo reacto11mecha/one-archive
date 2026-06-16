@@ -11,8 +11,10 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
+import * as schema from "~/server/db/schema";
 import { auth } from "~/server/better-auth";
 import { db } from "~/server/db";
+import { eq } from "drizzle-orm";
 
 /**
  * 1. CONTEXT
@@ -132,3 +134,29 @@ export const protectedProcedure = t.procedure
       },
     });
   });
+
+const enforceUserIsAdmin = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.session?.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+
+  const currentUser = await ctx.db.query.user.findFirst({
+    where: eq(schema.user.id, ctx.session.user.id),
+    with: { role: true },
+  });
+
+  if (!currentUser) throw new TRPCError({ code: "BAD_REQUEST" });
+
+  if (!currentUser.role?.isAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+
+  return next({
+    ctx: {
+      // infers the `session` as non-nullable
+      session: { ...ctx.session, user: currentUser },
+    },
+  });
+});
+
+export const adminProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(enforceUserIsAdmin);
