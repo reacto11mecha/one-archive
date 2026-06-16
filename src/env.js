@@ -7,14 +7,24 @@ export const env = createEnv({
    * isn't built with invalid env vars.
    */
   server: {
+    BASE_URL: z.string().url(),
+
     BETTER_AUTH_SECRET:
-      process.env.NODE_ENV === "production" ? z.string() : z.string().optional(),
-    BETTER_AUTH_GITHUB_CLIENT_ID: z.string(),
-    BETTER_AUTH_GITHUB_CLIENT_SECRET: z.string(),
+      process.env.NODE_ENV === "production"
+        ? z.string()
+        : z.string().optional(),
+    BETTER_AUTH_GOOGLE_CLIENT_ID: z.string(),
+    BETTER_AUTH_GOOGLE_CLIENT_SECRET: z.string(),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
-      .enum(["development", "test", "production"]) 
+      .enum(["development", "test", "production"])
       .default("development"),
+
+    STORAGE_ENDPOINT: z.string().url(),
+    STORAGE_REGION: z.string(),
+    STORAGE_ACCESS_KEY: z.string(),
+    STORAGE_SECRET_KEY: z.string(),
+    STORAGE_BUCKET_NAME: z.string(),
   },
 
   /**
@@ -31,11 +41,19 @@ export const env = createEnv({
    * middlewares) or client-side so we need to destruct manually.
    */
   runtimeEnv: {
+    BASE_URL: process.env.BASE_URL,
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
-    BETTER_AUTH_GITHUB_CLIENT_ID: process.env.BETTER_AUTH_GITHUB_CLIENT_ID,
-    BETTER_AUTH_GITHUB_CLIENT_SECRET: process.env.BETTER_AUTH_GITHUB_CLIENT_SECRET,
+    BETTER_AUTH_GOOGLE_CLIENT_ID: process.env.BETTER_AUTH_GOOGLE_CLIENT_ID,
+    BETTER_AUTH_GOOGLE_CLIENT_SECRET:
+      process.env.BETTER_AUTH_GOOGLE_CLIENT_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
+
+    STORAGE_ENDPOINT: process.env.STORAGE_ENDPOINT,
+    STORAGE_REGION: process.env.STORAGE_REGION,
+    STORAGE_ACCESS_KEY: process.env.STORAGE_ACCESS_KEY,
+    STORAGE_SECRET_KEY: process.env.STORAGE_SECRET_KEY,
+    STORAGE_BUCKET_NAME: process.env.STORAGE_BUCKET_NAME,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

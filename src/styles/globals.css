@@ -1,6 +1,30 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
+  --font-sans:
+    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+  /* 👇 Tambahkan palet warna dari HTML teman Anda di sini */
+  --color-navy: #0d1b3e;
+  --color-navy3: #1a2d66;
+  --color-accent: #2563eb;
+  --color-accent2: #1e50c8;
+  --color-gold: #e8a020;
+  --color-off: #f4f7fc;
+  --color-border-main: #d0daea; /* Ubah nama sedikit agar tidak bentrok dengan bawaan */
+  --color-text-main: #1a2340;
+  --color-muted: #6b7a99;
+  --color-danger: #dc2626;
+  --color-success: #16a34a;
+
+  --radius-main: 10px;
+  --shadow-main: 0 2px 12px rgba(13, 27, 62, 0.12);
+}
+
+/* 👇 Anda juga bisa langsung memindahkan CSS global base di sini */
+body {
+  background-color: var(--color-off);
+  color: var(--color-text-main);
+  font-size: 12px;
 }
