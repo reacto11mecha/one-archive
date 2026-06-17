@@ -148,10 +148,9 @@ export const archives = createTable("archive", {
   nomorSurat: text("nomor_surat"),
   title: text("title").notNull(),
   description: text("description"),
-  year: integer("year"),
   fileType: fileTypeEnum("file_type").notNull(),
 
-  // -- Storage MinIO --
+  // -- Storage SeaweedFS --
   fileKey: text("file_key").notNull(),
 
   // -- Klasifikasi --
@@ -164,7 +163,7 @@ export const archives = createTable("archive", {
   documentTypeId: text("document_type_id").references(() => documentTypes.id), // Nullable
 
   // -- JRA (Retensi) --
-  retentionDate: date("retention_date"),
+  retentionDate: timestamp("retention_date", { withTimezone: true }),
   retentionStatus: retentionStatusEnum("retention_status")
     .default("Aktif")
     .notNull(),

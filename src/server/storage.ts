@@ -16,6 +16,7 @@ export const s3Client =
       secretAccessKey: env.STORAGE_SECRET_KEY,
     },
     forcePathStyle: true,
+    requestChecksumCalculation: "WHEN_REQUIRED",
   });
 
 if (env.NODE_ENV !== "production") globalForS3.s3 = s3Client;
