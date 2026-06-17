@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import type { RouterOutputs } from "~/trpc/react";
 import { api } from "~/trpc/react";
 import { toast } from "sonner"; // 👈 Import toast dari sonner
+
+type RoleWithAccess = RouterOutputs["system"]["getRolesWithAccess"][number];
 
 export default function RolesManagementPage() {
   const ctx = api.useUtils();
@@ -81,9 +84,7 @@ export default function RolesManagementPage() {
     }));
   };
 
-  const handleOpenEdit = (
-    role: typeof roles extends Array<infer T> ? T : never,
-  ) => {
+  const handleOpenEdit = (role: RoleWithAccess) => {
     setFormData({
       id: role.id,
       name: role.name,
@@ -150,7 +151,7 @@ export default function RolesManagementPage() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => handleOpenEdit(role as any)}
+                  onClick={() => handleOpenEdit(role)}
                   className="cursor-pointer rounded p-1.5 text-[var(--color-muted)] transition-colors hover:bg-blue-50 hover:text-[var(--color-accent)]"
                   title="Edit"
                 >

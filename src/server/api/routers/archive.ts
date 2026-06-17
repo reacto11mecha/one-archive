@@ -113,7 +113,7 @@ export const archiveRouter = createTRPCRouter({
     const isAdmin = userCheck?.role?.isAdmin ?? false;
     const roleId = userCheck?.roleId;
 
-    let archivesList = [];
+    let archivesList: any[] = [];
 
     if (isAdmin) {
       archivesList = await ctx.db.query.archives.findMany({
