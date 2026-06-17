@@ -176,6 +176,30 @@ export const archives = createTable("archive", {
     .notNull()
     .references(() => roles.id),
 
+  isShared: boolean("is_shared").default(false).notNull(),
+
+  createdAt: timestamp("created_at")
+    .$defaultFn(() => new Date())
+    .notNull(),
+  updatedAt: timestamp("updated_at")
+    .$defaultFn(() => new Date())
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
+
+// ==========================================
+// TABEL MANAJEMEN PASSKEY SHARE
+// ==========================================
+export const archiveShares = createTable("archive_share", {
+  id: text("id").primaryKey(),
+  archiveId: text("archive_id")
+    .notNull()
+    .unique()
+    .references(() => archives.id, { onDelete: "cascade" }),
+
+  plainKey: text("plain_key").notNull(),
+  hashedKey: text("hashed_key").notNull(),
+
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),
@@ -275,5 +299,16 @@ export const archivesRelations = relations(archives, ({ one }) => ({
     fields: [archives.unitPengolahId],
     references: [roles.id],
     relationName: "unitPengolah",
+  }),
+  shareConfig: one(archiveShares, {
+    fields: [archives.id],
+    references: [archiveShares.archiveId],
+  }),
+}));
+
+export const archiveSharesRelations = relations(archiveShares, ({ one }) => ({
+  archive: one(archives, {
+    fields: [archiveShares.archiveId],
+    references: [archives.id],
   }),
 }));

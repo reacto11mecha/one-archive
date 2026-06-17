@@ -11,12 +11,14 @@ interface ArchiveTableProps {
   archivesList?: Archive[];
   classification?: Classification;
   onEdit: (arc: Archive) => void;
+  onShare: (arc: Archive) => void;
 }
 
 export function ArchiveTable({
   archivesList,
   classification,
   onEdit,
+  onShare,
 }: ArchiveTableProps) {
   const ctx = api.useUtils();
   const getFileAccessUrlMutation = api.archive.getFileAccessUrl.useMutation();
@@ -114,16 +116,30 @@ export function ArchiveTable({
                             {new Date(arc.createdAt).toLocaleDateString(
                               "id-ID",
                             )}{" "}
-                            | No: {arc.nomorSurat || "-"} {/* 👈 Diperbaiki */}
+                            | No: {arc.nomorSurat || "-"}
                           </span>
                           {arc.description && (
                             <span className="mt-1 block text-[11px] text-[var(--color-muted)] italic">
                               "{arc.description}"
                             </span>
                           )}
-                          <span className="mt-2 inline-block rounded-full border border-gray-200 bg-gray-50 px-[8px] py-[2px] text-[10px] font-semibold text-gray-600">
-                            👤 {arc.uploaderName}
-                          </span>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="inline-block rounded-full border border-gray-200 bg-gray-50 px-[8px] py-[2px] text-[10px] font-semibold text-gray-600">
+                              👤 {arc.uploaderName}
+                            </span>
+                            {/* 👇 INDIKATOR SHARE PASSKEY */}
+                            {arc.isShared && arc.shareConfig && (
+                              <span
+                                className="inline-block rounded-full border border-purple-200 bg-purple-50 px-[8px] py-[2px] text-[10px] font-semibold text-purple-700"
+                                title="Arsip dapat diakses publik"
+                              >
+                                🔗 Passkey:{" "}
+                                <span className="rounded border border-purple-100 bg-white px-1 font-mono">
+                                  {arc.shareConfig.plainKey}
+                                </span>
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -178,6 +194,18 @@ export function ArchiveTable({
                           title="Unduh"
                         >
                           ⬇️
+                        </button>
+                        {/* 👇 TOMBOL SHARE */}
+                        <button
+                          onClick={() => onShare(arc)}
+                          className={`rounded-[6px] p-[6px] transition-colors ${arc.isShared ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "bg-purple-50 text-purple-600 hover:bg-purple-100"}`}
+                          title={
+                            arc.isShared
+                              ? "Kelola Tautan Publik"
+                              : "Bagikan ke Publik"
+                          }
+                        >
+                          🔗
                         </button>
                         <button
                           onClick={() => onEdit(arc)}

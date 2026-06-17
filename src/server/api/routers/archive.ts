@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  publicProcedure,
+} from "~/server/api/trpc";
 import { s3Client } from "~/server/storage";
 import {
   PutObjectCommand,
@@ -12,11 +16,11 @@ import { randomUUID } from "crypto";
 import * as schema from "~/server/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import bcrypt from "bcryptjs"; // 👈 Tambahkan import bcrypt
 
 type FileTypeEnum = "PDF" | "Word" | "Excel" | "Gambar" | "Lainnya";
 
 function getFileTypeSafe(mimeType: string, fileName: string): FileTypeEnum {
-  // 1. Cek dari MIME Type terlebih dahulu
   if (mimeType === "application/pdf") return "PDF";
   if (mimeType.startsWith("image/")) return "Gambar";
   if (mimeType.includes("word") || mimeType === "application/msword")
@@ -24,7 +28,6 @@ function getFileTypeSafe(mimeType: string, fileName: string): FileTypeEnum {
   if (mimeType.includes("excel") || mimeType.includes("spreadsheet"))
     return "Excel";
 
-  // 2. Fallback menggunakan Switch Statement berdasarkan ekstensi
   const ext = fileName.split(".").pop()?.toLowerCase();
   switch (ext) {
     case "pdf":
@@ -46,67 +49,50 @@ function getFileTypeSafe(mimeType: string, fileName: string): FileTypeEnum {
 }
 
 export const archiveRouter = createTRPCRouter({
-  // 1. Fungsi bawaan Anda: Meminta URL upload dari S3 (SeaweedFS)
   getUploadUrl: protectedProcedure
     .input(z.object({ fileName: z.string(), fileType: z.string() }))
     .mutation(async ({ input }) => {
       const fileKey = `archives/${randomUUID()}-${input.fileName}`;
-
       const command = new PutObjectCommand({
         Bucket: env.STORAGE_BUCKET_NAME,
         Key: fileKey,
         ContentType: input.fileType,
       });
-
-      // URL ini berlaku selama 60 detik untuk upload ke S3
       const uploadUrl = await getSignedUrl(s3Client, command, {
         expiresIn: 60,
       });
-
       return { uploadUrl, fileKey };
     }),
 
-  // 2. Fungsi BARU: Mengambil daftar Klasifikasi Arsip sesuai Hak Akses (RBAC)
   getAllowedClassifications: protectedProcedure.query(async ({ ctx }) => {
-    // Ambil profil pengguna saat ini beserta rolenya
     const userCheck = await ctx.db.query.user.findFirst({
       where: eq(schema.user.id, ctx.session.user.id),
       with: { role: true },
     });
-
     const isAdmin = userCheck?.role?.isAdmin ?? false;
     const roleId = userCheck?.roleId;
 
     let allowedCategoryIds: string[] = [];
-
     if (isAdmin) {
-      // Jika Admin Utama, ambil SEMUA ID Kategori tanpa terkecuali
       const allCats = await ctx.db.query.categories.findMany();
       allowedCategoryIds = allCats.map((c) => c.id);
     } else if (roleId) {
-      // Jika staf/guru biasa, cari izinnya di tabel pivot 'roleCategoryAccess'
       const access = await ctx.db.query.roleCategoryAccess.findMany({
         where: eq(schema.roleCategoryAccess.roleId, roleId),
       });
       allowedCategoryIds = access.map((a) => a.categoryId);
     }
 
-    // Jika tidak punya akses ke kategori apa pun
     if (allowedCategoryIds.length === 0) {
       return { categories: [], subcategories: [], documentTypes: [] };
     }
 
-    // Tarik data Kategori yang HANYA diizinkan
     const categories = await ctx.db.query.categories.findMany({
       where: inArray(schema.categories.id, allowedCategoryIds),
     });
-
-    // Tarik Sub-Kategori yang HANYA berinduk pada Kategori yang diizinkan
     const subcategories = await ctx.db.query.subcategories.findMany({
       where: inArray(schema.subcategories.categoryId, allowedCategoryIds),
     });
-
-    // Tarik Jenis Surat yang HANYA berinduk pada Sub-Kategori di atas
     const subCatIds = subcategories.map((s) => s.id);
     const documentTypes =
       subCatIds.length > 0
@@ -127,11 +113,12 @@ export const archiveRouter = createTRPCRouter({
     const isAdmin = userCheck?.role?.isAdmin ?? false;
     const roleId = userCheck?.roleId;
 
-    let archivesList: any[] = [];
+    let archivesList = [];
 
     if (isAdmin) {
       archivesList = await ctx.db.query.archives.findMany({
         orderBy: (archives, { desc }) => [desc(archives.createdAt)],
+        with: { shareConfig: true }, // 👈 Tarik data passkey plain dari tabel share_config
       });
     } else if (roleId) {
       const access = await ctx.db.query.roleCategoryAccess.findMany({
@@ -143,13 +130,13 @@ export const archiveRouter = createTRPCRouter({
         archivesList = await ctx.db.query.archives.findMany({
           where: inArray(schema.archives.categoryId, allowedCategoryIds),
           orderBy: (archives, { desc }) => [desc(archives.createdAt)],
+          with: { shareConfig: true }, // 👈 Tarik data passkey plain dari tabel share_config
         });
       } else {
         archivesList = [];
       }
     }
 
-    // --- Kode uploaderName di bawah ini dibiarkan sama seperti aslinya ---
     const uploaderIds = [
       ...new Set(archivesList.map((a) => a.uploaderId)),
     ].filter(Boolean) as string[];
@@ -181,16 +168,12 @@ export const archiveRouter = createTRPCRouter({
       const command = new GetObjectCommand({
         Bucket: env.STORAGE_BUCKET_NAME,
         Key: input.fileKey,
-        // Jika minta didownload, paksa browser untuk mengunduhnya dengan nama asli file
         ResponseContentDisposition:
           input.action === "download"
             ? `attachment; filename="${input.originalName}"`
             : "inline",
       });
-
-      // Hasilkan URL yang valid selama 5 menit saja demi keamanan
-      const url = await getSignedUrl(s3Client, command, { expiresIn: 60 * 5 });
-      return url;
+      return await getSignedUrl(s3Client, command, { expiresIn: 60 * 5 });
     }),
 
   createArchive: protectedProcedure
@@ -204,7 +187,7 @@ export const archiveRouter = createTRPCRouter({
         originalName: z.string(),
         mimeType: z.string(),
         description: z.string().optional(),
-        nomorSurat: z.string().optional(), // 👈 Diperbaiki dari documentNumber
+        nomorSurat: z.string().optional(),
         createdAt: z.date().optional(),
         retentionDate: z.date().optional(),
       }),
@@ -226,7 +209,7 @@ export const archiveRouter = createTRPCRouter({
         subcategoryId: input.subcategoryId,
         documentTypeId: input.documentTypeId,
         description: input.description,
-        nomorSurat: input.nomorSurat, // 👈 Diperbaiki
+        nomorSurat: input.nomorSurat,
         createdAt: input.createdAt ?? new Date(),
         retentionDate: input.retentionDate,
         uploaderId: ctx.session.user.id,
@@ -234,14 +217,13 @@ export const archiveRouter = createTRPCRouter({
       });
     }),
 
-  // 👇 FITUR EDIT DIPERBAIKI
   updateArchive: protectedProcedure
     .input(
       z.object({
         id: z.string(),
         title: z.string(),
         description: z.string().optional(),
-        nomorSurat: z.string().optional(), // 👈 Diperbaiki
+        nomorSurat: z.string().optional(),
         createdAt: z.date().optional(),
         retentionDate: z.date().optional(),
       }),
@@ -252,18 +234,16 @@ export const archiveRouter = createTRPCRouter({
         .set({
           title: input.title,
           description: input.description,
-          nomorSurat: input.nomorSurat, // 👈 Diperbaiki
+          nomorSurat: input.nomorSurat,
           createdAt: input.createdAt,
           retentionDate: input.retentionDate,
         })
         .where(eq(schema.archives.id, input.id));
     }),
 
-  // 👇 ENDPOINT BARU: Hapus Arsip & Fisik File di S3
   deleteArchive: protectedProcedure
     .input(z.object({ id: z.string(), fileKey: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // 1. Hapus berkas fisik dari S3 agar penyimpanan tidak bengkak
       try {
         await s3Client.send(
           new DeleteObjectCommand({
@@ -273,12 +253,138 @@ export const archiveRouter = createTRPCRouter({
         );
       } catch (error) {
         console.error("Peringatan: Gagal menghapus berkas S3", error);
-        // Kita tidak melempar error agar data DB tetap bisa dihapus meski S3 bermasalah
       }
-
-      // 2. Hapus data dari Database
       return await ctx.db
         .delete(schema.archives)
         .where(eq(schema.archives.id, input.id));
+    }),
+
+  shareArchive: protectedProcedure
+    .input(
+      z.object({
+        archiveId: z.string(),
+        passkey: z.string().min(4, "Passkey minimal harus 4 karakter"),
+      }),
+    )
+    .mutation(({ ctx, input }) =>
+      ctx.db.transaction(async (tx) => {
+        const saltRound = 10;
+        const hashedPassword = await bcrypt.hash(input.passkey, saltRound);
+
+        await tx
+          .insert(schema.archiveShares)
+          .values({
+            id: randomUUID(),
+            archiveId: input.archiveId,
+            plainKey: input.passkey,
+            hashedKey: hashedPassword,
+          })
+          .onConflictDoUpdate({
+            target: schema.archiveShares.archiveId,
+            set: {
+              plainKey: input.passkey,
+              hashedKey: hashedPassword,
+              updatedAt: new Date(),
+            },
+          });
+
+        // 3. Ubah flag status isShared pada tabel dokumen menjadi true
+        await tx
+          .update(schema.archives)
+          .set({ isShared: true })
+          .where(eq(schema.archives.id, input.archiveId));
+
+        return { success: true };
+      }),
+    ),
+
+  unshareArchive: protectedProcedure
+    .input(z.object({ archiveId: z.string() }))
+    .mutation(({ ctx, input }) =>
+      ctx.db.transaction(async (tx) => {
+        // 1. Kembalikan flag isShared menjadi false
+        await ctx.db
+          .update(schema.archives)
+          .set({ isShared: false })
+          .where(eq(schema.archives.id, input.archiveId));
+
+        // 2. Hapus baris passkey terkait di database agar bersih
+        await ctx.db
+          .delete(schema.archiveShares)
+          .where(eq(schema.archiveShares.archiveId, input.archiveId));
+
+        return { success: true };
+      }),
+    ),
+
+  verifySharePasskey: publicProcedure
+    .input(z.object({ archiveId: z.string(), passkey: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      // 1. Cari arsip beserta konfigurasi share dan klasifikasinya
+      const archive = await ctx.db.query.archives.findFirst({
+        where: eq(schema.archives.id, input.archiveId),
+        with: {
+          shareConfig: true,
+          category: true,
+          subcategory: true,
+        },
+      });
+
+      // 2. Validasi apakah arsip ada dan status share sedang aktif
+      if (!archive || !archive.isShared || !archive.shareConfig) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message:
+            "Arsip tidak ditemukan atau tautan publik telah dinonaktifkan oleh Administrator.",
+        });
+      }
+
+      // 3. Bandingkan passkey input dengan hashedKey di database menggunakan bcrypt
+      const isValid = await bcrypt.compare(
+        input.passkey,
+        archive.shareConfig.hashedKey,
+      );
+      if (!isValid) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Passkey tidak valid. Akses ditolak.",
+        });
+      }
+
+      // 4. Jika lolos, buatkan Presigned URL S3 yang berumur pendek (misal 15 menit)
+      const actualExt = archive.fileKey.split(".").pop() || "pdf";
+      const cleanFileName = `${archive.title}.${actualExt}`;
+
+      const viewCommand = new GetObjectCommand({
+        Bucket: env.STORAGE_BUCKET_NAME,
+        Key: archive.fileKey,
+        ResponseContentDisposition: "inline",
+      });
+      const viewUrl = await getSignedUrl(s3Client, viewCommand, {
+        expiresIn: 60 * 15,
+      });
+
+      const dlCommand = new GetObjectCommand({
+        Bucket: env.STORAGE_BUCKET_NAME,
+        Key: archive.fileKey,
+        ResponseContentDisposition: `attachment; filename="${cleanFileName}"`,
+      });
+      const downloadUrl = await getSignedUrl(s3Client, dlCommand, {
+        expiresIn: 60 * 15,
+      });
+
+      // 5. Kembalikan data yang aman untuk konsumsi publik (hilangkan data sensitif)
+      return {
+        id: archive.id,
+        title: archive.title,
+        nomorSurat: archive.nomorSurat,
+        description: archive.description,
+        createdAt: archive.createdAt,
+        categoryName: archive.category?.name,
+        subcategoryName: archive.subcategory?.name,
+        fileType: archive.fileType,
+        viewUrl,
+        downloadUrl,
+      };
     }),
 });

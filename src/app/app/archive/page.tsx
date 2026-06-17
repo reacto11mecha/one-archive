@@ -5,6 +5,7 @@ import { api } from "~/trpc/react";
 import { UploadForm } from "~/app/_components/UploadForm";
 import { ArchiveTable } from "~/app/_components/ArchiveTable";
 import { EditModal } from "~/app/_components/EditModal";
+import { ShareModal } from "~/app/_components/ShareModal";
 
 export default function ArchiveManagementPage() {
   const { data: classification, isLoading: isClassLoading } =
@@ -21,9 +22,13 @@ export default function ArchiveManagementPage() {
   const [filterCategory, setFilterCategory] = useState("");
   const [sortBy, setSortBy] = useState("newest");
 
-  // State Baru: Rentang Tanggal
+  // State Rentang Tanggal
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // State Modal Share Arsip
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareData, setShareData] = useState<any>(null);
 
   if (isClassLoading || isArchivesLoading) {
     return (
@@ -201,7 +206,19 @@ export default function ArchiveManagementPage() {
           setEditData(arc);
           setEditModalOpen(true);
         }}
+        onShare={(arc: any) => {
+          setShareData(arc);
+          setShareModalOpen(true);
+        }}
       />
+
+      {/* Modal Share Arsip */}
+      {shareModalOpen && shareData && (
+        <ShareModal
+          shareData={shareData}
+          onClose={() => setShareModalOpen(false)}
+        />
+      )}
 
       {/* Modal Pengeditan */}
       {editModalOpen && editData && (
