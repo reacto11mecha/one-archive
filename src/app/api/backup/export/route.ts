@@ -48,7 +48,6 @@ export async function GET() {
     const archives = await db.query.archives.findMany();
     const categories = await db.query.categories.findMany();
     const subcategories = await db.query.subcategories.findMany();
-    const documentTypes = await db.query.documentTypes.findMany();
     const roles = await db.query.roles.findMany();
     const roleCategoryAccess = await db.query.roleCategoryAccess.findMany();
 
@@ -78,7 +77,6 @@ export async function GET() {
         users,
         categories,
         subcategories,
-        documentTypes,
         archives,
         roleCategoryAccess,
       },

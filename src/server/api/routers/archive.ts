@@ -16,7 +16,7 @@ import { randomUUID } from "crypto";
 import * as schema from "~/server/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import bcrypt from "bcryptjs"; // 👈 Tambahkan import bcrypt
+import bcrypt from "bcryptjs";
 
 type FileTypeEnum = "PDF" | "Word" | "Excel" | "Gambar" | "Lainnya";
 
@@ -84,7 +84,7 @@ export const archiveRouter = createTRPCRouter({
     }
 
     if (allowedCategoryIds.length === 0) {
-      return { categories: [], subcategories: [], documentTypes: [] };
+      return { categories: [], subcategories: [] };
     }
 
     const categories = await ctx.db.query.categories.findMany({
@@ -93,15 +93,8 @@ export const archiveRouter = createTRPCRouter({
     const subcategories = await ctx.db.query.subcategories.findMany({
       where: inArray(schema.subcategories.categoryId, allowedCategoryIds),
     });
-    const subCatIds = subcategories.map((s) => s.id);
-    const documentTypes =
-      subCatIds.length > 0
-        ? await ctx.db.query.documentTypes.findMany({
-            where: inArray(schema.documentTypes.subcategoryId, subCatIds),
-          })
-        : [];
 
-    return { categories, subcategories, documentTypes };
+    return { categories, subcategories };
   }),
 
   getArchives: protectedProcedure.query(async ({ ctx }) => {
@@ -118,7 +111,7 @@ export const archiveRouter = createTRPCRouter({
     if (isAdmin) {
       archivesList = await ctx.db.query.archives.findMany({
         orderBy: (archives, { desc }) => [desc(archives.createdAt)],
-        with: { shareConfig: true }, // 👈 Tarik data passkey plain dari tabel share_config
+        with: { shareConfig: true },
       });
     } else if (roleId) {
       const access = await ctx.db.query.roleCategoryAccess.findMany({
@@ -130,7 +123,7 @@ export const archiveRouter = createTRPCRouter({
         archivesList = await ctx.db.query.archives.findMany({
           where: inArray(schema.archives.categoryId, allowedCategoryIds),
           orderBy: (archives, { desc }) => [desc(archives.createdAt)],
-          with: { shareConfig: true }, // 👈 Tarik data passkey plain dari tabel share_config
+          with: { shareConfig: true },
         });
       } else {
         archivesList = [];
@@ -182,7 +175,7 @@ export const archiveRouter = createTRPCRouter({
         title: z.string(),
         categoryId: z.string(),
         subcategoryId: z.string(),
-        documentTypeId: z.string(),
+        archiveType: z.enum(["Masuk", "Keluar"]),
         fileKey: z.string(),
         originalName: z.string(),
         mimeType: z.string(),
@@ -204,10 +197,10 @@ export const archiveRouter = createTRPCRouter({
         id: randomUUID(),
         title: input.title,
         fileType: exactFileType,
+        archiveType: input.archiveType,
         fileKey: input.fileKey,
         categoryId: input.categoryId,
         subcategoryId: input.subcategoryId,
-        documentTypeId: input.documentTypeId,
         description: input.description,
         nomorSurat: input.nomorSurat,
         createdAt: input.createdAt ?? new Date(),
@@ -222,6 +215,7 @@ export const archiveRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         title: z.string(),
+        archiveType: z.enum(["Masuk", "Keluar"]).optional(),
         description: z.string().optional(),
         nomorSurat: z.string().optional(),
         createdAt: z.date().optional(),
@@ -233,6 +227,7 @@ export const archiveRouter = createTRPCRouter({
         .update(schema.archives)
         .set({
           title: input.title,
+          archiveType: input.archiveType,
           description: input.description,
           nomorSurat: input.nomorSurat,
           createdAt: input.createdAt,
@@ -288,7 +283,6 @@ export const archiveRouter = createTRPCRouter({
             },
           });
 
-        // 3. Ubah flag status isShared pada tabel dokumen menjadi true
         await tx
           .update(schema.archives)
           .set({ isShared: true })
@@ -302,13 +296,11 @@ export const archiveRouter = createTRPCRouter({
     .input(z.object({ archiveId: z.string() }))
     .mutation(({ ctx, input }) =>
       ctx.db.transaction(async (tx) => {
-        // 1. Kembalikan flag isShared menjadi false
         await ctx.db
           .update(schema.archives)
           .set({ isShared: false })
           .where(eq(schema.archives.id, input.archiveId));
 
-        // 2. Hapus baris passkey terkait di database agar bersih
         await ctx.db
           .delete(schema.archiveShares)
           .where(eq(schema.archiveShares.archiveId, input.archiveId));
@@ -317,10 +309,26 @@ export const archiveRouter = createTRPCRouter({
       }),
     ),
 
+  checkShareStatus: publicProcedure
+    .input(z.object({ archiveId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      // Hanya tarik kolom isShared saja agar ringan dan aman
+      const archive = await ctx.db.query.archives.findFirst({
+        where: eq(schema.archives.id, input.archiveId),
+        columns: { isShared: true },
+      });
+
+      // Jika arsip tidak ada di database ATAU isShared sudah dimatikan
+      if (!archive || !archive.isShared) {
+        return { isValid: false };
+      }
+
+      return { isValid: true };
+    }),
+
   verifySharePasskey: publicProcedure
     .input(z.object({ archiveId: z.string(), passkey: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // 1. Cari arsip beserta konfigurasi share dan klasifikasinya
       const archive = await ctx.db.query.archives.findFirst({
         where: eq(schema.archives.id, input.archiveId),
         with: {
@@ -330,7 +338,6 @@ export const archiveRouter = createTRPCRouter({
         },
       });
 
-      // 2. Validasi apakah arsip ada dan status share sedang aktif
       if (!archive || !archive.isShared || !archive.shareConfig) {
         throw new TRPCError({
           code: "NOT_FOUND",
@@ -339,7 +346,6 @@ export const archiveRouter = createTRPCRouter({
         });
       }
 
-      // 3. Bandingkan passkey input dengan hashedKey di database menggunakan bcrypt
       const isValid = await bcrypt.compare(
         input.passkey,
         archive.shareConfig.hashedKey,
@@ -351,7 +357,6 @@ export const archiveRouter = createTRPCRouter({
         });
       }
 
-      // 4. Jika lolos, buatkan Presigned URL S3 yang berumur pendek (misal 15 menit)
       const actualExt = archive.fileKey.split(".").pop() || "pdf";
       const cleanFileName = `${archive.title}.${actualExt}`;
 
@@ -373,7 +378,6 @@ export const archiveRouter = createTRPCRouter({
         expiresIn: 60 * 15,
       });
 
-      // 5. Kembalikan data yang aman untuk konsumsi publik (hilangkan data sensitif)
       return {
         id: archive.id,
         title: archive.title,
@@ -402,7 +406,6 @@ export const archiveRouter = createTRPCRouter({
         });
       }
 
-      // 1. Hapus file fisik dari S3 untuk menghemat storage
       if (archive.fileKey !== "DESTROYED") {
         try {
           await s3Client.send(
@@ -413,16 +416,14 @@ export const archiveRouter = createTRPCRouter({
           );
         } catch (error) {
           console.error("Gagal menghapus file fisik di S3:", error);
-          // Tetap lanjut ubah status database sebagai bentuk fail-safe
         }
       }
 
-      // 2. Ubah status di database menjadi "Dimusnahkan" tanpa menghapus baris metadata
       await ctx.db
         .update(schema.archives)
         .set({
           retentionStatus: "Dimusnahkan",
-          fileKey: "DESTROYED", // Tandai file key agar tidak bisa diakses/diunduh lagi
+          fileKey: "DESTROYED",
           updatedAt: new Date(),
         })
         .where(eq(schema.archives.id, input.archiveId));

@@ -93,9 +93,6 @@ export function ArchiveTable({
                 const subcategoryObj = classification?.subcategories.find(
                   (s) => s.id === arc.subcategoryId,
                 );
-                const docTypeObj = classification?.documentTypes.find(
-                  (d) => d.id === arc.documentTypeId,
-                );
 
                 return (
                   <tr
@@ -108,9 +105,20 @@ export function ArchiveTable({
                           {actualExt}
                         </span>
                         <div>
-                          <span className="block text-[13px] font-bold text-[var(--color-text-main)]">
-                            {arc.title}
-                          </span>
+                          <div className="mb-1 flex items-center gap-2">
+                            {/* 👇 Indikator Arsip Masuk / Keluar */}
+                            <span
+                              className={`inline-flex items-center rounded-sm px-[6px] py-[2px] text-[9px] font-bold tracking-wider uppercase ${arc.archiveType === "Masuk" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}
+                            >
+                              {arc.archiveType === "Masuk"
+                                ? "📥 MASUK"
+                                : "📤 KELUAR"}
+                            </span>
+                            <span className="block text-[13px] font-bold text-[var(--color-text-main)]">
+                              {arc.title}
+                            </span>
+                          </div>
+
                           <span className="block text-[11px] text-[var(--color-muted)]">
                             Tgl:{" "}
                             {new Date(arc.createdAt).toLocaleDateString(
@@ -127,7 +135,6 @@ export function ArchiveTable({
                             <span className="inline-block rounded-full border border-gray-200 bg-gray-50 px-[8px] py-[2px] text-[10px] font-semibold text-gray-600">
                               👤 {arc.uploaderName}
                             </span>
-                            {/* 👇 INDIKATOR SHARE PASSKEY */}
                             {arc.isShared && arc.shareConfig && (
                               <span
                                 className="inline-block rounded-full border border-purple-200 bg-purple-50 px-[8px] py-[2px] text-[10px] font-semibold text-purple-700"
@@ -151,11 +158,8 @@ export function ArchiveTable({
                       <span className="mt-0.5 block pl-[14px] text-[11px] font-medium text-[var(--color-text-main)]">
                         └─ {subcategoryObj?.name || arc.subcategoryId}
                       </span>
-                      <span className="mt-0.5 block pl-[28px] text-[11px] text-[var(--color-muted)]">
-                        └─ {docTypeObj?.name || "Jenis tidak terdefinisi"}
-                      </span>
 
-                      <div className="mt-3 pl-[28px]">
+                      <div className="mt-3 pl-[14px]">
                         {arc.retentionDate ? (
                           <span
                             className={`inline-block rounded-[6px] px-[8px] py-[3px] text-[9px] font-bold tracking-wider uppercase ${isExpired ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}
@@ -195,7 +199,6 @@ export function ArchiveTable({
                         >
                           ⬇️
                         </button>
-                        {/* 👇 TOMBOL SHARE */}
                         <button
                           onClick={() => onShare(arc)}
                           className={`rounded-[6px] p-[6px] transition-colors ${arc.isShared ? "bg-purple-100 text-purple-700 hover:bg-purple-200" : "bg-purple-50 text-purple-600 hover:bg-purple-100"}`}

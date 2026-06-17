@@ -1,194 +1,254 @@
 import { eq } from "drizzle-orm";
 import { db } from "./index";
 import * as schema from "./schema";
-
-// 👇 Sesuaikan path ini dengan lokasi file konfigurasi Better-Auth Anda
 import { auth } from "../better-auth/config";
 
 async function main() {
-  console.log("🌱 Mulai melakukan seeding database...");
+  console.log("⏳ Memulai pembersihan database (Resetting)...");
+
+  // Hapus data lama dengan urutan cascade yang aman
+  await db.delete(schema.archiveShares);
+  await db.delete(schema.archives);
+  await db.delete(schema.subcategories);
+  await db.delete(schema.roleCategoryAccess);
+  await db.delete(schema.account);
+  await db.delete(schema.user);
+  await db.delete(schema.categories);
+  await db.delete(schema.roles);
+
+  console.log("✅ Database bersih. Mulai menyuntikkan data seed baru...");
 
   // 1. SEED ROLES
-  console.log("Memasukkan data Role (Unit Pengolah)...");
   const rolesData = [
-    { id: "role_admin", name: "Administrator", isAdmin: true },
-    { id: "role_kurikulum", name: "Kurikulum", isAdmin: false },
+    { id: "role_admin", name: "Administrator Utama", isAdmin: true },
     {
-      id: "role_kepegawaian",
-      name: "Administrasi Umum / Kepegawaian",
+      id: "role_kurikulum",
+      name: "Bidang Kurikulum & Kesiswaan",
       isAdmin: false,
     },
-    { id: "role_keuangan", name: "Keuangan", isAdmin: false },
-    { id: "role_sarpras", name: "Sarana dan Prasarana", isAdmin: false },
+    { id: "role_admin_umum", name: "Bidang Administrasi Umum", isAdmin: false },
+    { id: "role_keuangan", name: "Bidang Keuangan", isAdmin: false },
+    { id: "role_sarpras", name: "Bidang Sarana & Prasarana", isAdmin: false },
   ];
-  await db
-    .insert(schema.roles)
-    .values(rolesData)
-    .onConflictDoNothing({ target: schema.roles.id });
+  await db.insert(schema.roles).values(rolesData);
+  console.log("🌱 Roles fungsional berhasil ditambahkan.");
 
-  // 2. SEED KATEGORI UTAMA
-  console.log("Memasukkan data Kategori Utama...");
+  // 2. SEED CATEGORIES
   const categoriesData = [
     {
-      id: "akademik",
-      name: "Arsip Akademik",
-      icon: "📚",
-      colorBadge: "badge-blue",
+      id: "cat_akademik",
+      name: "Arsip Academic",
+      icon: "📖",
+      colorBadge: "blue",
     },
     {
-      id: "kesiswaan",
+      id: "cat_kesiswaan",
       name: "Arsip Kesiswaan",
-      icon: "🎓",
-      colorBadge: "badge-green",
+      icon: "👨‍🎓",
+      colorBadge: "indigo",
     },
     {
-      id: "kepegawaian",
+      id: "cat_kepegawaian",
       name: "Arsip Kepegawaian",
       icon: "👥",
-      colorBadge: "badge-gold",
+      colorBadge: "green",
     },
     {
-      id: "keuangan",
+      id: "cat_keuangan",
       name: "Arsip Keuangan",
       icon: "💰",
-      colorBadge: "badge-red",
+      colorBadge: "amber",
     },
     {
-      id: "sarpras",
-      name: "Arsip Sarana & Prasarana",
-      icon: "🏫",
-      colorBadge: "badge-purple",
+      id: "cat_sarpras",
+      name: "Arsip Sarana dan Prasarana",
+      icon: "🏢",
+      colorBadge: "orange",
     },
     {
-      id: "surat",
+      id: "cat_surat",
       name: "Arsip Surat Menyurat",
       icon: "✉️",
-      colorBadge: "badge-gray",
+      colorBadge: "purple",
     },
   ];
-  await db
-    .insert(schema.categories)
-    .values(categoriesData)
-    .onConflictDoNothing({ target: schema.categories.id });
+  await db.insert(schema.categories).values(categoriesData);
+  console.log("🌱 Kategori Utama berhasil ditambahkan.");
 
-  // 3. SEED AKSES KATEGORI PER ROLE
-  console.log("Memasukkan data Hak Akses Role -> Kategori...");
+  // 3. SEED ROLE CATEGORY ACCESS
   const accessData = [
-    { roleId: "role_kurikulum", categoryId: "akademik" },
-    { roleId: "role_kurikulum", categoryId: "kesiswaan" },
-    { roleId: "role_kepegawaian", categoryId: "kepegawaian" },
-    { roleId: "role_kepegawaian", categoryId: "surat" },
-    { roleId: "role_keuangan", categoryId: "keuangan" },
-    { roleId: "role_sarpras", categoryId: "sarpras" },
+    { roleId: "role_kurikulum", categoryId: "cat_akademik" },
+    { roleId: "role_kurikulum", categoryId: "cat_kesiswaan" },
+    { roleId: "role_admin_umum", categoryId: "cat_kepegawaian" },
+    { roleId: "role_admin_umum", categoryId: "cat_surat" },
+    { roleId: "role_keuangan", categoryId: "cat_keuangan" },
+    { roleId: "role_sarpras", categoryId: "cat_sarpras" },
   ];
-  await db
-    .insert(schema.roleCategoryAccess)
-    .values(accessData)
-    .onConflictDoNothing({
-      target: [
-        schema.roleCategoryAccess.roleId,
-        schema.roleCategoryAccess.categoryId,
-      ],
-    });
+  await db.insert(schema.roleCategoryAccess).values(accessData);
 
-  // 4. SEED SUB-KATEGORI
-  console.log("Memasukkan data Sub-Kategori...");
+  // 4. SEED SUBCATEGORIES (Sudah Diperbaiki Huruf Kapitalnya)
   const subcategoriesData = [
-    { id: "sub_akd_1", categoryId: "akademik", name: "Rapor Siswa" },
-    { id: "sub_akd_2", categoryId: "akademik", name: "Daftar Nilai" },
-    { id: "sub_akd_3", categoryId: "akademik", name: "Jadwal Pelajaran" },
-    { id: "sub_akd_4", categoryId: "akademik", name: "Kalender Akademik" },
-    { id: "sub_akd_5", categoryId: "akademik", name: "Data Kelulusan" },
-    { id: "sub_ksw_1", categoryId: "kesiswaan", name: "Data Siswa" },
+    // A. Arsip Akademik
     {
-      id: "sub_ksw_2",
-      categoryId: "kesiswaan",
+      id: "sub_akademik_rapor",
+      categoryId: "cat_akademik",
+      name: "Rapor Siswa",
+    },
+    {
+      id: "sub_akademik_nilai",
+      categoryId: "cat_akademik",
+      name: "Daftar Nilai",
+    },
+    {
+      id: "sub_akademik_jadwal",
+      categoryId: "cat_akademik",
+      name: "Jadwal Pelajaran",
+    },
+    {
+      id: "sub_akademik_kalender",
+      categoryId: "cat_akademik",
+      name: "Kalender Akademik",
+    },
+    {
+      id: "sub_akademik_lulus",
+      categoryId: "cat_akademik",
+      name: "Data Kelulusan",
+    },
+
+    // B. Arsip Kesiswaan
+    {
+      id: "sub_kesiswaan_data",
+      categoryId: "cat_kesiswaan",
+      name: "Data Siswa",
+    },
+    {
+      id: "sub_kesiswaan_pelanggar",
+      categoryId: "cat_kesiswaan",
       name: "Data Pelanggaran Siswa",
     },
-    { id: "sub_ksw_3", categoryId: "kesiswaan", name: "Data Ekstrakurikuler" },
-    { id: "sub_kpg_1", categoryId: "kepegawaian", name: "Data Guru" },
-    { id: "sub_kpg_2", categoryId: "kepegawaian", name: "Data Pegawai" },
-    { id: "sub_keu_1", categoryId: "keuangan", name: "BOS" },
-    { id: "sub_keu_2", categoryId: "keuangan", name: "Bukti Pembayaran" },
     {
-      id: "sub_keu_3",
-      categoryId: "keuangan",
+      id: "sub_kesiswaan_ekskul",
+      categoryId: "cat_kesiswaan",
+      name: "Data Ekstrakurikuler",
+    },
+
+    // C. Arsip Kepegawaian
+    {
+      id: "sub_pegawai_guru",
+      categoryId: "cat_kepegawaian",
+      name: "Data Guru",
+    },
+    {
+      id: "sub_pegawai_staff",
+      categoryId: "cat_kepegawaian",
+      name: "Data Pegawai",
+    },
+
+    // D. Arsip Keuangan
+    { id: "sub_keu_bos", categoryId: "cat_keuangan", name: "BOS" },
+    {
+      id: "sub_keu_bukti",
+      categoryId: "cat_keuangan",
+      name: "Bukti Pembayaran",
+    },
+    {
+      id: "sub_keu_laporan",
+      categoryId: "cat_keuangan",
       name: "Laporan Keuangan Sekolah",
     },
-    { id: "sub_srp_1", categoryId: "sarpras", name: "Inventaris Barang" },
-    { id: "sub_srp_2", categoryId: "sarpras", name: "Data Ruang Kelas" },
-    { id: "sub_srt_1", categoryId: "surat", name: "Surat Masuk" },
-    { id: "sub_srt_2", categoryId: "surat", name: "Surat Keluar" },
-  ];
-  await db
-    .insert(schema.subcategories)
-    .values(subcategoriesData)
-    .onConflictDoNothing({ target: schema.subcategories.id });
 
-  // 5. SEED JENIS SURAT
-  console.log("Memasukkan data Jenis Surat...");
-  const docTypesData = [
-    { id: "doc_sm_1", subcategoryId: "sub_srt_1", name: "Surat Undangan" },
-    { id: "doc_sm_2", subcategoryId: "sub_srt_1", name: "Surat Pemberitahuan" },
-    { id: "doc_sm_3", subcategoryId: "sub_srt_1", name: "Surat Edaran" },
-    { id: "doc_sm_4", subcategoryId: "sub_srt_1", name: "Surat Permohonan" },
-    { id: "doc_sm_5", subcategoryId: "sub_srt_1", name: "Surat Kerja Sama" },
-    { id: "doc_sk_1", subcategoryId: "sub_srt_2", name: "Surat Undangan" },
-    { id: "doc_sk_2", subcategoryId: "sub_srt_2", name: "Surat Keterangan" },
-    { id: "doc_sk_3", subcategoryId: "sub_srt_2", name: "Surat Tugas" },
-    { id: "doc_sk_4", subcategoryId: "sub_srt_2", name: "Surat Rekomendasi" },
-    { id: "doc_sk_5", subcategoryId: "sub_srt_2", name: "Surat Pemberitahuan" },
-  ];
-  await db
-    .insert(schema.documentTypes)
-    .values(docTypesData)
-    .onConflictDoNothing({ target: schema.documentTypes.id });
+    // E. Arsip Sarana dan Prasarana
+    {
+      id: "sub_sarpras_inventaris",
+      categoryId: "cat_sarpras",
+      name: "Inventaris Barang",
+    },
+    {
+      id: "sub_sarpras_ruang",
+      categoryId: "cat_sarpras",
+      name: "Data Ruang Kelas",
+    },
 
-  // 6. SEED AKUN DUMMY (Menggunakan Better Auth)
+    // F. Arsip Surat Menyurat
+    {
+      id: "sub_surat_undangan",
+      categoryId: "cat_surat",
+      name: "Surat Undangan",
+    },
+    {
+      id: "sub_surat_pemberitahuan",
+      categoryId: "cat_surat",
+      name: "Surat Pemberitahuan",
+    },
+    { id: "sub_surat_edaran", categoryId: "cat_surat", name: "Surat Edaran" },
+    {
+      id: "sub_surat_permohonan",
+      categoryId: "cat_surat",
+      name: "Surat Permohonan",
+    },
+    {
+      id: "sub_surat_kerjasama",
+      categoryId: "cat_surat",
+      name: "Surat Kerja Sama",
+    },
+    {
+      id: "sub_surat_keterangan",
+      categoryId: "cat_surat",
+      name: "Surat Keterangan",
+    },
+    { id: "sub_surat_tugas", categoryId: "cat_surat", name: "Surat Tugas" },
+    {
+      id: "sub_surat_rekomendasi",
+      categoryId: "cat_surat",
+      name: "Surat Rekomendasi",
+    },
+  ];
+  await db.insert(schema.subcategories).values(subcategoriesData);
+  console.log("🌱 Sub-Kategori (Tingkat 2) berhasil diperbarui.");
+
+  // 5. SEED AKUN DUMMY (Domain Email Berakhir mail.id)
   console.log("Memasukkan data Akun Dummy...");
   const dummyUsers = [
     {
-      email: "admin@mail.com",
-      password: "smasatuberjaya",
-      name: "Kepala TU",
+      email: "admin@mail.id",
+      name: "rmecha (Admin)",
       roleId: "role_admin",
     },
     {
-      email: "user1.kurikulum@mail.com",
-      password: "smasatuberjaya",
-      name: "User Kurikulum",
+      email: "kurikulum@mail.id",
+      name: "Staff Kurikulum",
       roleId: "role_kurikulum",
     },
+    {
+      email: "adminumum@mail.id",
+      name: "Staff Admin Umum",
+      roleId: "role_admin_umum",
+    },
+    {
+      email: "keuangan@mail.id",
+      name: "Staff Keuangan",
+      roleId: "role_keuangan",
+    },
+    { email: "sarpras@mail.id", name: "Staff Sarpras", roleId: "role_sarpras" },
   ];
 
   for (const u of dummyUsers) {
     try {
-      // Periksa apakah email sudah terdaftar di database
-      const existingUser = await db.query.user.findFirst({
-        where: eq(schema.user.email, u.email),
+      const res = await auth.api.signUpEmail({
+        body: {
+          email: u.email,
+          password: "smasatuberjaya",
+          name: u.name,
+        },
       });
 
-      if (!existingUser) {
-        // Buat user melalui Better Auth API agar password di-hash secara otomatis
-        const res = await auth.api.signUpEmail({
-          body: {
-            email: u.email,
-            password: u.password,
-            name: u.name,
-          },
-        });
+      if (res?.user) {
+        await db
+          .update(schema.user)
+          .set({ roleId: u.roleId, emailVerified: true })
+          .where(eq(schema.user.id, res.user.id));
 
-        if (res?.user) {
-          // Suntikkan roleId secara manual menggunakan Drizzle ORM
-          await db
-            .update(schema.user)
-            .set({ roleId: u.roleId })
-            .where(eq(schema.user.id, res.user.id));
-
-          console.log(`✅ User ${u.email} berhasil dibuat.`);
-        }
-      } else {
-        console.log(`⚠️ User ${u.email} sudah ada, dilewati.`);
+        console.log(`✅ User ${u.email} berhasil dibuat.`);
       }
     } catch (err) {
       console.error(
@@ -198,7 +258,7 @@ async function main() {
     }
   }
 
-  console.log("✅ Seeding database berhasil diselesaikan!");
+  console.log("🎉 Proses Seeding Selesai Sempurna!");
   process.exit(0);
 }
 

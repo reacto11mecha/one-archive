@@ -13,14 +13,23 @@ export default function PublicSharePage() {
   const [passkey, setPasskey] = useState("");
   const [archiveData, setArchiveData] = useState<any>(null);
 
+  const { data: shareStatus, isLoading: isChecking } =
+    api.archive.checkShareStatus.useQuery(
+      { archiveId },
+      {
+        retry: false, // Jangan coba ulang jika memang tidak ada
+        refetchOnWindowFocus: false,
+      },
+    );
+
   const verifyMutation = api.archive.verifySharePasskey.useMutation({
     onSuccess: (data) => {
       toast.success("Akses berhasil dibuka!");
-      setArchiveData(data); // Simpan data arsip dan S3 URL ke state
+      setArchiveData(data);
     },
     onError: (err) => {
       toast.error(err.message || "Passkey salah.");
-      setPasskey(""); // Kosongkan input jika salah
+      setPasskey("");
     },
   });
 
@@ -30,9 +39,35 @@ export default function PublicSharePage() {
     verifyMutation.mutate({ archiveId, passkey });
   };
 
-  // ==============================================================
-  // KONDISI 1: SUKSES LOGIN (MENAMPILKAN DATA & QR CODE)
-  // ==============================================================
+  if (isChecking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--color-navy)] to-[var(--color-navy3)] p-4">
+        <div className="animate-pulse text-[12px] text-white">
+          Memeriksa tautan...
+        </div>
+      </div>
+    );
+  }
+
+  if (!shareStatus?.isValid) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+        <div className="animate-in fade-in zoom-in w-full max-w-sm rounded-[16px] border-[1.5px] border-gray-200 bg-white p-8 text-center shadow-sm duration-300">
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-3xl text-red-500">
+            📭
+          </div>
+          <h1 className="text-[16px] font-extrabold text-[var(--color-navy)]">
+            Tautan Tidak Valid
+          </h1>
+          <p className="mt-2 text-[12px] leading-relaxed text-[var(--color-muted)]">
+            Dokumen arsip yang Anda cari tidak ditemukan, ID salah, atau
+            Administrator telah mencabut akses publik untuk dokumen ini.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (archiveData) {
     const currentUrl =
       typeof window !== "undefined" ? window.location.href : "";
@@ -40,7 +75,6 @@ export default function PublicSharePage() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[var(--color-off)] p-4">
         <div className="animate-in fade-in zoom-in w-full max-w-md overflow-hidden rounded-[16px] bg-white shadow-[0_20px_60px_rgba(13,27,62,0.08)] duration-300">
-          {/* Header Aplikasi */}
           <div className="bg-[var(--color-navy)] px-6 py-4 text-center">
             <h1 className="text-[16px] font-bold text-white">
               One Archive Secure Portal
@@ -51,12 +85,10 @@ export default function PublicSharePage() {
           </div>
 
           <div className="flex flex-col items-center p-8">
-            {/* Bagian Atas: QR Code */}
             <div className="mb-6 rounded-[16px] border-[1.5px] border-gray-100 bg-white p-4 shadow-sm">
               <QRCodeSVG value={currentUrl} size={160} level="M" />
             </div>
 
-            {/* Bagian Tengah: Informasi Arsip */}
             <div className="mb-8 w-full space-y-4">
               <div className="text-center">
                 <span className="mb-3 inline-block rounded-full bg-blue-50 px-3 py-1 text-[10px] font-bold text-blue-700 uppercase">
@@ -104,7 +136,6 @@ export default function PublicSharePage() {
               </div>
             </div>
 
-            {/* Bagian Bawah: Tombol Aksi */}
             <div className="grid w-full grid-cols-2 gap-3">
               <button
                 onClick={() => window.open(archiveData.viewUrl, "_blank")}
@@ -125,9 +156,6 @@ export default function PublicSharePage() {
     );
   }
 
-  // ==============================================================
-  // KONDISI 2: LAYAR KUNCI (MEMINTA PASSKEY)
-  // ==============================================================
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[var(--color-navy)] to-[var(--color-navy3)] p-4">
       <div className="animate-in fade-in w-full max-w-sm rounded-[16px] bg-white p-8 shadow-2xl duration-300">

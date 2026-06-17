@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "~/trpc/react";
+import { api, type RouterOutputs } from "~/trpc/react";
 import { authClient } from "~/server/better-auth/client";
 import Link from "next/link";
 import {
@@ -16,6 +16,8 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+
+type Archive = RouterOutputs["archive"]["getArchives"][number];
 
 export default function DashboardPage() {
   const { data: session } = authClient.useSession();
@@ -333,7 +335,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* --- BARIS 3: TABEL AKTIVITAS TERBARU (Porsi Penuh / Full Width) --- */}
+      {/* --- BARIS 3: TABEL AKTIVITAS TERBARU DENGAN LENCANA MASUK/KELUAR --- */}
       <div className="w-full overflow-hidden rounded-[12px] border-[1.5px] border-[var(--color-border-main)] bg-white shadow-sm">
         <div className="flex items-center justify-between border-b-[1.5px] border-[var(--color-border-main)] bg-[var(--color-off)]/50 p-[16px]">
           <div>
@@ -377,9 +379,19 @@ export default function DashboardPage() {
                     className="border-b-[1.5px] border-[var(--color-border-main)] transition-colors last:border-0 hover:bg-blue-50/20"
                   >
                     <td className="p-[14px_16px]">
-                      <span className="block text-[13px] font-bold text-[var(--color-text-main)]">
-                        {arc.title}
-                      </span>
+                      {/* 👇 PENAMBAHAN LENCANA MASUK / KELUAR DI TABEL DASHBOARD */}
+                      <div className="mb-1 flex items-center gap-2">
+                        <span
+                          className={`inline-flex items-center rounded-sm px-[6px] py-[2px] text-[9px] font-bold tracking-wider uppercase ${arc.archiveType === "Masuk" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"}`}
+                        >
+                          {arc.archiveType === "Masuk"
+                            ? "📥 MASUK"
+                            : "📤 KELUAR"}
+                        </span>
+                        <span className="block max-w-[200px] truncate text-[13px] font-bold text-[var(--color-text-main)] sm:max-w-none">
+                          {arc.title}
+                        </span>
+                      </div>
                       <span className="mt-0.5 block text-[11px] text-[var(--color-muted)]">
                         Nomor: {arc.nomorSurat || "-"}
                       </span>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api } from "~/trpc/react";
 import { toast } from "sonner";
 
-type ModalType = "NONE" | "CATEGORY" | "SUBCATEGORY" | "DOCTYPE";
+type ModalType = "NONE" | "CATEGORY" | "SUBCATEGORY";
 
 export default function ClassificationManagementPage() {
   const ctx = api.useUtils();
@@ -24,11 +24,6 @@ export default function ClassificationManagementPage() {
 
   const createSubcategoryMutation = api.system.createSubcategory.useMutation({
     onSuccess: () => handleSuccess("Sub-kategori berhasil disisipkan!"),
-    onError: (err) => toast.error(err.message),
-  });
-
-  const createDocTypeMutation = api.system.createDocumentType.useMutation({
-    onSuccess: () => handleSuccess("Jenis dokumen baru berhasil didaftarkan!"),
     onError: (err) => toast.error(err.message),
   });
 
@@ -75,12 +70,6 @@ export default function ClassificationManagementPage() {
         categoryId: selectedParentId,
         name: inputName,
       });
-    } else if (modalType === "DOCTYPE") {
-      createDocTypeMutation.mutate({
-        id: generateSlug(inputName, "doc"),
-        subcategoryId: selectedParentId,
-        name: inputName,
-      });
     }
   };
 
@@ -95,9 +84,14 @@ export default function ClassificationManagementPage() {
   return (
     <div className="relative space-y-4">
       <div className="mb-[16px] flex items-center justify-between">
-        <h3 className="text-[14px] font-bold text-[var(--color-navy)]">
-          Struktur Klasifikasi Dokumen
-        </h3>
+        <div>
+          <h3 className="text-[14px] font-bold text-[var(--color-navy)]">
+            Struktur Klasifikasi Dokumen (2 Tingkat)
+          </h3>
+          <p className="mt-1 text-[11px] text-[var(--color-muted)]">
+            Kelola hierarki Kategori Utama dan Sub-Kategori di bawah ini.
+          </p>
+        </div>
         <button
           onClick={() => setModalType("CATEGORY")}
           className="inline-flex cursor-pointer items-center gap-[5px] rounded-[7px] bg-[var(--color-accent)] px-[14px] py-[7px] text-[12px] font-semibold text-white transition-colors hover:bg-[var(--color-accent2)]"
@@ -108,6 +102,12 @@ export default function ClassificationManagementPage() {
 
       {/* Arsitektur Komponen Tingkat 1: Kategori Utama */}
       <div className="space-y-[16px]">
+        {data?.categories.length === 0 && (
+          <div className="rounded-[10px] border-[1.5px] border-dashed border-gray-300 p-8 text-center text-[12px] text-gray-400">
+            Belum ada struktur klasifikasi yang terdaftar.
+          </div>
+        )}
+
         {data?.categories.map((cat) => {
           const matchedSubs = data.subcategories.filter(
             (s) => s.categoryId === cat.id,
@@ -153,82 +153,31 @@ export default function ClassificationManagementPage() {
               {/* Arsitektur Komponen Tingkat 2: Sub-Kategori */}
               <div className="ml-[10px] space-y-[10px] border-l-2 border-gray-100 pl-[20px]">
                 {matchedSubs.length > 0 ? (
-                  matchedSubs.map((sub) => {
-                    const matchedDocs = data.documentTypes.filter(
-                      (d) => d.subcategoryId === sub.id,
-                    );
-
-                    return (
-                      <div
-                        key={sub.id}
-                        className="rounded-[8px] border border-gray-200/70 bg-[var(--color-off)] p-[12px]"
+                  matchedSubs.map((sub) => (
+                    <div
+                      key={sub.id}
+                      className="flex items-center justify-between rounded-[8px] border border-gray-200/70 bg-[var(--color-off)] p-[12px]"
+                    >
+                      <span className="text-[12px] font-bold text-[var(--color-text-main)]">
+                        🔹 {sub.name}{" "}
+                        <span className="font-mono text-[10px] font-normal text-[var(--color-muted)]">
+                          ({sub.id})
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Hapus sub-kategori ${sub.name}?`))
+                            deleteMutation.mutate({
+                              type: "subcategory",
+                              id: sub.id,
+                            });
+                        }}
+                        className="cursor-pointer text-[12px] text-gray-400 hover:text-[var(--color-danger)]"
                       >
-                        <div className="mb-[8px] flex items-center justify-between">
-                          <span className="text-[12px] font-bold text-[var(--color-text-main)]">
-                            🔹 {sub.name}{" "}
-                            <span className="font-mono text-[10px] font-normal text-[var(--color-muted)]">
-                              ({sub.id})
-                            </span>
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedParentId(sub.id);
-                                setModalType("DOCTYPE");
-                              }}
-                              className="cursor-pointer text-[11px] font-semibold text-[var(--color-muted)] hover:text-[var(--color-text-main)]"
-                            >
-                              + Jenis Surat
-                            </button>
-                            <button
-                              onClick={() => {
-                                if (confirm(`Hapus sub-kategori ${sub.name}?`))
-                                  deleteMutation.mutate({
-                                    type: "subcategory",
-                                    id: sub.id,
-                                  });
-                              }}
-                              className="cursor-pointer text-[12px] text-gray-400 hover:text-[var(--color-danger)]"
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Arsitektur Komponen Tingkat 3: Jenis Surat */}
-                        <div className="flex flex-wrap gap-[6px] pl-[14px]">
-                          {matchedDocs.length > 0 ? (
-                            matchedDocs.map((doc) => (
-                              <span
-                                key={doc.id}
-                                className="inline-flex items-center gap-2 rounded-[6px] border border-[var(--color-border-main)] bg-white p-[4px_10px] text-[11px] font-medium text-[var(--color-text-main)] shadow-sm"
-                              >
-                                📄 {doc.name}
-                                <button
-                                  onClick={() => {
-                                    if (
-                                      confirm(`Hapus jenis surat ${doc.name}?`)
-                                    )
-                                      deleteMutation.mutate({
-                                        type: "documentType",
-                                        id: doc.id,
-                                      });
-                                  }}
-                                  className="ml-1 cursor-pointer text-[10px] text-gray-400 hover:text-[var(--color-danger)]"
-                                >
-                                  ×
-                                </button>
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-[10px] text-[var(--color-muted)] italic">
-                              Belum ada jenis surat terdaftar.
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
+                        🗑️
+                      </button>
+                    </div>
+                  ))
                 ) : (
                   <span className="block p-1 text-[11px] text-[var(--color-muted)] italic">
                     Belum ada sub-kategori.
@@ -242,12 +191,11 @@ export default function ClassificationManagementPage() {
 
       {/* Modal Dialog Tunggal Bersama (Dynamic Modal) */}
       {modalType !== "NONE" && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/45 backdrop-blur-sm">
           <div className="animate-in fade-in zoom-in w-[460px] rounded-[14px] bg-white p-[28px] shadow-[0_20px_60px_rgba(0,0,0,0.3)] duration-150">
             <h2 className="mb-[16px] text-[15px] font-bold text-[var(--color-navy)]">
               {modalType === "CATEGORY" && "Tambah Kategori Utama"}
               {modalType === "SUBCATEGORY" && "Tambah Sub-Kategori"}
-              {modalType === "DOCTYPE" && "Tambah Jenis Surat Baru"}
             </h2>
 
             <form onSubmit={handleSubmit}>
@@ -274,7 +222,11 @@ export default function ClassificationManagementPage() {
                 <input
                   type="text"
                   required
-                  placeholder="cth: Kalender Akademik, Surat Tugas, BOS..."
+                  placeholder={
+                    modalType === "CATEGORY"
+                      ? "cth: Kesiswaan, Akademik..."
+                      : "cth: Rapor Siswa, Data Alumni..."
+                  }
                   value={inputName}
                   onChange={(e) => setInputName(e.target.value)}
                   className="w-full rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[9px_12px] text-[12px] transition-colors outline-none focus:border-[var(--color-accent)]"

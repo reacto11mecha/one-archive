@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, adminProcedure } from "~/server/api/trpc";
 import * as schema from "~/server/db/schema";
-import { eq, not, desc } from "drizzle-orm";
+import { eq, not } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { auth } from "~/server/better-auth/config";
 
@@ -37,7 +37,6 @@ export const systemRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Cek apakah email sudah dipakai
       const existingUser = await ctx.db.query.user.findFirst({
         where: eq(schema.user.email, input.email),
       });
@@ -49,7 +48,6 @@ export const systemRouter = createTRPCRouter({
         });
       }
 
-      // Buat akun via Better-Auth agar password di-hash secara otomatis
       const res = await auth.api.signUpEmail({
         body: {
           email: input.email,
@@ -107,14 +105,13 @@ export const systemRouter = createTRPCRouter({
   upsertRole: adminProcedure
     .input(
       z.object({
-        id: z.string().min(1, "ID Peran wajib diisi"), // cth: role_keuangan
+        id: z.string().min(1, "ID Peran wajib diisi"),
         name: z.string().min(1, "Nama Peran wajib diisi"),
         isAdmin: z.boolean(),
         categoryIds: z.array(z.string()),
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      // Upsert data utama role
       await ctx.db
         .insert(schema.roles)
         .values({ id: input.id, name: input.name, isAdmin: input.isAdmin })
@@ -123,12 +120,10 @@ export const systemRouter = createTRPCRouter({
           set: { name: input.name, isAdmin: input.isAdmin },
         });
 
-      // Bersihkan hak akses lama untuk role ini agar tidak duplikat
       await ctx.db
         .delete(schema.roleCategoryAccess)
         .where(eq(schema.roleCategoryAccess.roleId, input.id));
 
-      // Masukkan matriks hak akses yang baru dicentang
       if (input.categoryIds.length > 0) {
         const accessToInsert = input.categoryIds.map((catId) => ({
           roleId: input.id,
@@ -143,7 +138,6 @@ export const systemRouter = createTRPCRouter({
   deleteRole: adminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // Proteksi agar Admin Utama tidak bisa dihapus hingga sistem lumpuh
       if (input.id === "role_admin") {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -156,20 +150,16 @@ export const systemRouter = createTRPCRouter({
         .where(eq(schema.roles.id, input.id));
     }),
 
-  // 10. Ambil seluruh data Kategori, Sub-Kategori, dan Jenis Dokumen secara terpisah untuk digabungkan di frontend
   getClassificationData: adminProcedure.query(async ({ ctx }) => {
     const allCategories = await ctx.db.query.categories.findMany();
     const allSubcategories = await ctx.db.query.subcategories.findMany();
-    const allDocumentTypes = await ctx.db.query.documentTypes.findMany();
 
     return {
       categories: allCategories,
       subcategories: allSubcategories,
-      documentTypes: allDocumentTypes,
     };
   }),
 
-  // 11. Tambah Kategori Utama
   createCategory: adminProcedure
     .input(
       z.object({
@@ -187,7 +177,6 @@ export const systemRouter = createTRPCRouter({
       });
     }),
 
-  // 12. Tambah Sub-Kategori
   createSubcategory: adminProcedure
     .input(
       z.object({
@@ -200,24 +189,10 @@ export const systemRouter = createTRPCRouter({
       return await ctx.db.insert(schema.subcategories).values(input);
     }),
 
-  // 13. Tambah Jenis Surat / Dokumen
-  createDocumentType: adminProcedure
-    .input(
-      z.object({
-        id: z.string().min(1),
-        subcategoryId: z.string().min(1),
-        name: z.string().min(1, "Nama jenis surat wajib diisi"),
-      }),
-    )
-    .mutation(async ({ ctx, input }) => {
-      return await ctx.db.insert(schema.documentTypes).values(input);
-    }),
-
-  // 14. Hapus Komponen Klasifikasi (Kategori / Sub / Jenis)
   deleteClassificationItem: adminProcedure
     .input(
       z.object({
-        type: z.enum(["category", "subcategory", "documentType"]),
+        type: z.enum(["category", "subcategory"]),
         id: z.string(),
       }),
     )
@@ -230,10 +205,6 @@ export const systemRouter = createTRPCRouter({
         await ctx.db
           .delete(schema.subcategories)
           .where(eq(schema.subcategories.id, input.id));
-      } else {
-        await ctx.db
-          .delete(schema.documentTypes)
-          .where(eq(schema.documentTypes.id, input.id));
       }
       return { success: true };
     }),

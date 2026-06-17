@@ -2,230 +2,227 @@
 
 import { useState } from "react";
 import { api } from "~/trpc/react";
-import { UploadForm } from "~/app/_components/UploadForm";
 import { ArchiveTable } from "~/app/_components/ArchiveTable";
 import { EditModal } from "~/app/_components/EditModal";
 import { ShareModal } from "~/app/_components/ShareModal";
+import { UploadForm } from "~/app/_components/UploadForm";
 
-export default function ArchiveManagementPage() {
-  const { data: classification, isLoading: isClassLoading } =
-    api.archive.getAllowedClassifications.useQuery();
+export default function ArchivePage() {
   const { data: archivesList, isLoading: isArchivesLoading } =
     api.archive.getArchives.useQuery();
+  const { data: classification, isLoading: isClassificationLoading } =
+    api.archive.getAllowedClassifications.useQuery();
 
-  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editData, setEditData] = useState<any>(null);
 
-  // State Fitur Pencarian & Filter
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterCategory, setFilterCategory] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
-
-  // State Rentang Tanggal
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  // State Modal Share Arsip
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareData, setShareData] = useState<any>(null);
 
-  if (isClassLoading || isArchivesLoading) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterArchiveType, setFilterArchiveType] = useState("");
+
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+
+  if (isArchivesLoading || isClassificationLoading) {
     return (
       <div className="text-[12px] text-[var(--color-muted)]">
-        Memuat data arsip...
+        Memuat pusat arsip...
       </div>
     );
   }
 
-  // --- ENGINE FILTRASI & PENCARIAN (CLIENT SIDE) ---
-  const processedArchives = (() => {
-    if (!archivesList) return [];
+  // 👇 Filter Engine Logic Diperbarui
+  const processedArchives = archivesList?.filter((arc) => {
+    const matchSearch =
+      arc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (arc.nomorSurat &&
+        arc.nomorSurat.toLowerCase().includes(searchQuery.toLowerCase()));
 
-    let list = [...archivesList];
+    const matchCategory = filterCategory
+      ? arc.categoryId === filterCategory
+      : true;
+    const matchType = filterArchiveType
+      ? arc.archiveType === filterArchiveType
+      : true;
 
-    // 1. Filter Kata Kunci (Nama Dokumen / Nomor Arsip / Deskripsi)
-    if (searchQuery.trim() !== "") {
-      const query = searchQuery.toLowerCase();
-      list = list.filter(
-        (arc) =>
-          arc.title.toLowerCase().includes(query) ||
-          (arc.documentNumber &&
-            arc.documentNumber.toLowerCase().includes(query)) ||
-          (arc.nomorSurat && arc.nomorSurat.toLowerCase().includes(query)) ||
-          (arc.description && arc.description.toLowerCase().includes(query)),
-      );
+    // Filter Berdasarkan Rentang Tanggal Arsip Dibuat
+    let matchDate = true;
+    const arcDate = new Date(arc.createdAt);
+
+    if (filterStartDate) {
+      const start = new Date(filterStartDate);
+      start.setHours(0, 0, 0, 0); // Set ke awal hari
+      matchDate = matchDate && arcDate >= start;
     }
 
-    // 2. Filter Berdasarkan Kategori Utama
-    if (filterCategory !== "") {
-      list = list.filter((arc) => arc.categoryId === filterCategory);
+    if (filterEndDate) {
+      const end = new Date(filterEndDate);
+      end.setHours(23, 59, 59, 999); // Set ke penghujung hari
+      matchDate = matchDate && arcDate <= end;
     }
 
-    // 3. Filter Rentang Tanggal (Date Range)
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      list = list.filter((arc) => new Date(arc.createdAt) >= start);
-    }
-
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999); // Mencakup hingga detik terakhir di hari tersebut
-      list = list.filter((arc) => new Date(arc.createdAt) <= end);
-    }
-
-    // 4. Logika Pengurutan (Sorting)
-    list.sort((a, b) => {
-      if (sortBy === "newest")
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      if (sortBy === "oldest")
-        return (
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-      if (sortBy === "alpha-asc") return a.title.localeCompare(b.title);
-      if (sortBy === "alpha-desc") return b.title.localeCompare(a.title);
-      return 0;
-    });
-
-    return list;
-  })();
+    return matchSearch && matchCategory && matchType && matchDate;
+  });
 
   return (
-    <div className="relative space-y-[20px]">
-      {/* Header Utama */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-[24px]">
+      <div className="flex flex-col gap-[16px] md:flex-row md:items-center md:justify-between">
         <div>
-          <h2 className="text-[16px] font-bold text-[var(--color-navy)]">
+          <h2 className="text-[18px] font-bold text-[var(--color-navy)]">
             Pusat Arsip Dokumen
           </h2>
+          <p className="text-[12px] text-[var(--color-muted)]">
+            Kelola, cari, dan unggah dokumen arsip digital Anda di sini.
+          </p>
         </div>
-        <button
-          onClick={() => setShowUploadForm(!showUploadForm)}
-          className={`cursor-pointer rounded-[7px] border-[1.5px] px-[14px] py-[8px] text-[12px] font-bold transition-all ${
-            showUploadForm
-              ? "border-[var(--color-border-main)] bg-[var(--color-off)] text-gray-600 hover:bg-gray-200"
-              : "border-[var(--color-accent)] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent2)]"
-          }`}
-        >
-          {showUploadForm ? "✕ Batal Unggah" : "+ Unggah Arsip Baru"}
-        </button>
+        {!isUploadOpen && (
+          <button
+            onClick={() => setIsUploadOpen(true)}
+            className="rounded-[8px] bg-[var(--color-accent)] px-[16px] py-[8px] text-[12px] font-bold text-white shadow-sm transition-colors hover:bg-[var(--color-accent2)]"
+          >
+            + Unggah Arsip Baru
+          </button>
+        )}
       </div>
 
-      {/* Form Upload */}
-      {showUploadForm && (
-        <UploadForm
-          classification={classification}
-          onSuccess={() => setShowUploadForm(false)}
-          onCancel={() => setShowUploadForm(false)}
-        />
-      )}
-
-      {/* --- BARIS UTENSIL PENCARIAN & FILTER --- */}
-      <div className="flex flex-col gap-[12px] rounded-[10px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[14px] shadow-sm md:flex-row md:items-center md:justify-between">
-        {/* Kolom Pencarian */}
-        <div className="flex min-w-[260px] flex-1 items-center gap-[8px]">
-          <input
-            type="text"
-            placeholder="Cari nama dokumen, nomor arsip..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[8px_12px] text-[12px] transition-colors outline-none focus:border-[var(--color-accent)]"
+      {isUploadOpen ? (
+        <div className="animate-in fade-in rounded-[12px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[24px] shadow-sm duration-300">
+          <div className="mb-[16px] flex items-center justify-between border-b-[1.5px] border-[var(--color-border-main)] pb-[16px]">
+            <h3 className="text-[14px] font-bold text-[var(--color-navy)]">
+              Formulir Unggah Dokumen
+            </h3>
+            <button
+              onClick={() => setIsUploadOpen(false)}
+              className="text-[12px] font-bold text-red-500 transition-colors hover:text-red-700"
+            >
+              Batalkan
+            </button>
+          </div>
+          <UploadForm
+            classification={classification}
+            onSuccess={() => setIsUploadOpen(false)}
+            onCancel={() => setIsUploadOpen(false)}
           />
         </div>
+      ) : (
+        <>
+          {/* Kotak Filter Pencarian & Kategori */}
+          <div className="flex flex-col gap-[16px] rounded-[12px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[16px] shadow-sm">
+            {/* Baris 1: Filter Teks (Pencarian Full Width) */}
+            <div className="w-full">
+              <input
+                type="text"
+                placeholder="Cari nama dokumen atau nomor surat secara cepat..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[10px_14px] text-[13px] transition-colors outline-none focus:border-[var(--color-accent)]"
+              />
+            </div>
 
-        {/* Kolom Filter & Sorting */}
-        <div className="flex flex-wrap items-center gap-[10px]">
-          {/* Filter Rentang Tanggal */}
-          <div className="flex items-center gap-[6px] rounded-[7px] border-[1.5px] border-[var(--color-border-main)] bg-white px-[8px] py-[6px] transition-colors focus-within:border-[var(--color-accent)]">
-            <span className="text-[11px] font-medium text-[var(--color-muted)]">
-              📅 Periode:
-            </span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="bg-transparent text-[11px] text-[var(--color-navy)] outline-none"
-            />
-            <span className="text-[11px] text-[var(--color-muted)]">-</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="bg-transparent text-[11px] text-[var(--color-navy)] outline-none"
-            />
-            {(startDate || endDate) && (
-              <button
-                onClick={() => {
-                  setStartDate("");
-                  setEndDate("");
-                }}
-                className="ml-1 rounded-full bg-gray-200 px-1.5 text-[9px] text-gray-500 hover:bg-gray-300"
-                title="Hapus Filter Tanggal"
-              >
-                ✕
-              </button>
-            )}
+            {/* Baris 2: Dropdown di Kiri, Tanggal di Kanan (Layar Lebar) */}
+            <div className="flex flex-col gap-[16px] border-t-[1.5px] border-[var(--color-border-main)] pt-[16px] xl:flex-row xl:items-center xl:justify-between">
+              {/* KELOMPOK KIRI: Dropdown Kategori & Alur Arsip */}
+              <div className="flex w-full flex-col gap-[12px] sm:flex-row xl:w-auto">
+                <select
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
+                  className="w-full min-w-[160px] rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[6px_10px] text-[12px] transition-colors outline-none focus:border-[var(--color-accent)] sm:w-auto"
+                >
+                  <option value="">Semua Kategori</option>
+                  {classification?.categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.icon} {c.name}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={filterArchiveType}
+                  onChange={(e) => setFilterArchiveType(e.target.value)}
+                  className="w-full min-w-[140px] rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[6px_10px] text-[12px] font-medium transition-colors outline-none focus:border-[var(--color-accent)] sm:w-auto"
+                >
+                  <option value="">Semua Alur Arsip</option>
+                  <option value="Masuk">📥 Arsip Masuk</option>
+                  <option value="Keluar">📤 Arsip Keluar</option>
+                </select>
+              </div>
+
+              {/* KELOMPOK KANAN: Rentang Tanggal & Tombol Hapus */}
+              <div className="flex w-full flex-col gap-[12px] sm:flex-row sm:items-center xl:w-auto">
+                <span className="text-[12px] font-semibold whitespace-nowrap text-[var(--color-navy)]">
+                  📅 Tanggal Dibuat:
+                </span>
+                <div className="flex w-full items-center gap-[8px] sm:w-auto">
+                  <input
+                    type="date"
+                    value={filterStartDate}
+                    onChange={(e) => setFilterStartDate(e.target.value)}
+                    className="flex-1 rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[6px_10px] text-[12px] text-gray-600 transition-colors outline-none focus:border-[var(--color-accent)] sm:flex-none"
+                  />
+                  <span className="text-[12px] font-medium text-gray-400">
+                    s/d
+                  </span>
+                  <input
+                    type="date"
+                    value={filterEndDate}
+                    onChange={(e) => setFilterEndDate(e.target.value)}
+                    className="flex-1 rounded-[7px] border-[1.5px] border-[var(--color-border-main)] p-[6px_10px] text-[12px] text-gray-600 transition-colors outline-none focus:border-[var(--color-accent)] sm:flex-none"
+                  />
+                </div>
+
+                {/* Tombol Hapus Rentang */}
+                {(filterStartDate || filterEndDate) && (
+                  <button
+                    onClick={() => {
+                      setFilterStartDate("");
+                      setFilterEndDate("");
+                    }}
+                    className="w-full rounded-[6px] bg-red-50 px-3 py-1.5 text-[11px] font-bold whitespace-nowrap text-red-500 transition-colors hover:bg-red-100 hover:text-red-700 sm:w-auto"
+                  >
+                    × Hapus Rentang
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Dropdown Filter Kategori */}
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="cursor-pointer rounded-[7px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[8px_12px] text-[12px] transition-colors outline-none focus:border-[var(--color-accent)]"
-          >
-            <option value="">-- Semua Kategori --</option>
-            {classification?.categories.map((cat: any) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.icon} {cat.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Dropdown Pengurutan Data */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="cursor-pointer rounded-[7px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[8px_12px] text-[12px] transition-colors outline-none focus:border-[var(--color-accent)]"
-          >
-            <option value="newest">📉 Urutan: Terbaru</option>
-            <option value="oldest">📈 Urutan: Terlama</option>
-            <option value="alpha-asc">🔤 Nama: A - Z</option>
-            <option value="alpha-desc">🔤 Nama: Z - A</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Komponen Tabel Utama */}
-      <ArchiveTable
-        archivesList={processedArchives}
-        classification={classification}
-        onEdit={(arc: any) => {
-          setEditData(arc);
-          setEditModalOpen(true);
-        }}
-        onShare={(arc: any) => {
-          setShareData(arc);
-          setShareModalOpen(true);
-        }}
-      />
-
-      {/* Modal Share Arsip */}
-      {shareModalOpen && shareData && (
-        <ShareModal
-          shareData={shareData}
-          onClose={() => setShareModalOpen(false)}
-        />
+          <ArchiveTable
+            archivesList={processedArchives}
+            classification={classification}
+            onEdit={(arc: any) => {
+              setEditData(arc);
+              setEditModalOpen(true);
+            }}
+            onShare={(arc: any) => {
+              setShareData(arc);
+              setShareModalOpen(true);
+            }}
+          />
+        </>
       )}
 
-      {/* Modal Pengeditan */}
       {editModalOpen && editData && (
         <EditModal
           editData={editData}
           setEditData={setEditData}
-          onClose={() => setEditModalOpen(false)}
+          onClose={() => {
+            setEditModalOpen(false);
+            setEditData(null);
+          }}
+        />
+      )}
+
+      {shareModalOpen && shareData && (
+        <ShareModal
+          shareData={shareData}
+          onClose={() => {
+            setShareModalOpen(false);
+            setShareData(null);
+          }}
         />
       )}
     </div>

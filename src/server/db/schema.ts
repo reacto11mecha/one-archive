@@ -11,10 +11,6 @@ import {
   timestamp,
 } from "drizzle-orm/pg-core";
 
-/**
- * Gunakan pgTableCreator untuk memberi awalan pada tabel aplikasi kita.
- * Ini mencegah bentrok nama tabel di database.
- */
 export const createTable = pgTableCreator((name) => `one_archive_${name}`);
 
 // ==========================================
@@ -34,8 +30,10 @@ export const retentionStatusEnum = pgEnum("retention_status", [
   "Permanen",
 ]);
 
+export const archiveTypeEnum = pgEnum("archive_type", ["Masuk", "Keluar"]);
+
 // ==========================================
-// 2. TABEL BAWAAN BETTER-AUTH (Dimodifikasi)
+// 2. TABEL OTENTIKASI & PENGGUNA
 // ==========================================
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -45,7 +43,6 @@ export const user = pgTable("user", {
     .$defaultFn(() => false)
     .notNull(),
   image: text("image"),
-  // 👇 Tambahan: Menghubungkan user dengan role (Unit Pengolah)
   roleId: text("role_id").references(() => roles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
@@ -96,17 +93,16 @@ export const verification = pgTable("verification", {
 });
 
 // ==========================================
-// 3. TABEL APLIKASI ARSIP (Kustom)
+// 3. TABEL MANAJEMEN ARSIP (2-TINGKAT)
 // ==========================================
-
 export const roles = createTable("role", {
-  id: text("id").primaryKey(), // misal: 'role_kurikulum'
-  name: text("name").notNull(), // misal: 'Kurikulum'
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
   isAdmin: boolean("is_admin").default(false).notNull(),
 });
 
 export const categories = createTable("category", {
-  id: text("id").primaryKey(), // misal: 'akademik'
+  id: text("id").primaryKey(),
   name: text("name").notNull(),
   icon: text("icon"),
   colorBadge: text("color_badge"),
@@ -122,9 +118,7 @@ export const roleCategoryAccess = createTable(
       .notNull()
       .references(() => categories.id, { onDelete: "cascade" }),
   },
-  (t) => [
-    primaryKey({ columns: [t.roleId, t.categoryId] }), // Composite Primary Key
-  ],
+  (t) => [primaryKey({ columns: [t.roleId, t.categoryId] })],
 );
 
 export const subcategories = createTable("subcategory", {
@@ -135,40 +129,34 @@ export const subcategories = createTable("subcategory", {
   name: text("name").notNull(),
 });
 
-export const documentTypes = createTable("document_type", {
-  id: text("id").primaryKey(),
-  subcategoryId: text("subcategory_id")
-    .notNull()
-    .references(() => subcategories.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-});
+// ❌ TABEL documentTypes TELAH DIHAPUS SEPENUHNYA DI SINI
 
 export const archives = createTable("archive", {
-  id: text("id").primaryKey(), // Akan diisi UUID dari backend (crypto.randomUUID)
+  id: text("id").primaryKey(),
   nomorSurat: text("nomor_surat"),
   title: text("title").notNull(),
   description: text("description"),
   fileType: fileTypeEnum("file_type").notNull(),
 
-  // -- Storage SeaweedFS --
-  fileKey: text("file_key").notNull(),
+  // 👇 KOLOM BARU SEBAGAI PENGGANTI SUB-JENIS (MASUK / KELUAR)
+  archiveType: archiveTypeEnum("archive_type").notNull(),
 
-  // -- Klasifikasi --
+  fileKey: text("file_key").notNull(),
+  isShared: boolean("is_shared").default(false).notNull(),
+
   categoryId: text("category_id")
     .notNull()
     .references(() => categories.id),
   subcategoryId: text("subcategory_id")
     .notNull()
     .references(() => subcategories.id),
-  documentTypeId: text("document_type_id").references(() => documentTypes.id), // Nullable
+  // ❌ KOLOM documentTypeId TELAH DIHAPUS
 
-  // -- JRA (Retensi) --
   retentionDate: timestamp("retention_date", { withTimezone: true }),
   retentionStatus: retentionStatusEnum("retention_status")
     .default("Aktif")
     .notNull(),
 
-  // -- Relasi User & Unit --
   uploaderId: text("uploader_id")
     .notNull()
     .references(() => user.id),
@@ -176,8 +164,6 @@ export const archives = createTable("archive", {
     .notNull()
     .references(() => roles.id),
 
-  isShared: boolean("is_shared").default(false).notNull(),
-
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),
@@ -187,19 +173,14 @@ export const archives = createTable("archive", {
     .notNull(),
 });
 
-// ==========================================
-// TABEL MANAJEMEN PASSKEY SHARE
-// ==========================================
 export const archiveShares = createTable("archive_share", {
   id: text("id").primaryKey(),
   archiveId: text("archive_id")
     .notNull()
     .unique()
     .references(() => archives.id, { onDelete: "cascade" }),
-
   plainKey: text("plain_key").notNull(),
   hashedKey: text("hashed_key").notNull(),
-
   createdAt: timestamp("created_at")
     .$defaultFn(() => new Date())
     .notNull(),
@@ -210,9 +191,8 @@ export const archiveShares = createTable("archive_share", {
 });
 
 // ==========================================
-// 4. DEFINISI RELASI (Untuk kemudahan Query)
+// 4. DEFINISI RELASI DATA
 // ==========================================
-
 export const userRelations = relations(user, ({ one, many }) => ({
   account: many(account),
   session: many(session),
@@ -261,21 +241,11 @@ export const subcategoriesRelations = relations(
       fields: [subcategories.categoryId],
       references: [categories.id],
     }),
-    documentTypes: many(documentTypes),
     archives: many(archives),
   }),
 );
 
-export const documentTypesRelations = relations(
-  documentTypes,
-  ({ one, many }) => ({
-    subcategory: one(subcategories, {
-      fields: [documentTypes.subcategoryId],
-      references: [subcategories.id],
-    }),
-    archives: many(archives),
-  }),
-);
+// ❌ RELASI documentTypesRelations TELAH DIHAPUS
 
 export const archivesRelations = relations(archives, ({ one }) => ({
   category: one(categories, {
@@ -286,10 +256,7 @@ export const archivesRelations = relations(archives, ({ one }) => ({
     fields: [archives.subcategoryId],
     references: [subcategories.id],
   }),
-  documentType: one(documentTypes, {
-    fields: [archives.documentTypeId],
-    references: [documentTypes.id],
-  }),
+  // ❌ FIELD RELASI documentType DIHAPUS
   uploader: one(user, {
     fields: [archives.uploaderId],
     references: [user.id],
