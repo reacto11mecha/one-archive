@@ -70,8 +70,30 @@ export default async function AuthenticatedLayout({
 
   return (
     <div className="flex min-h-screen bg-[var(--color-off)] font-sans text-[var(--color-text-main)]">
-      <aside className="fixed top-0 left-0 z-100 flex h-screen w-[220px] min-w-[220px] flex-col bg-[var(--color-navy)]">
-        <div className="border-b border-white/10 p-[18px_16px_14px]">
+      <input type="checkbox" id="mobile-sidebar" className="peer hidden" />
+
+      <label
+        htmlFor="mobile-sidebar"
+        className="fixed inset-0 z-[998] hidden cursor-pointer bg-black/50 backdrop-blur-sm peer-checked:block md:hidden"
+      ></label>
+
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            document.addEventListener('click', function(e) {
+              if (window.innerWidth < 768) {
+                if (e.target.closest('aside a') || e.target.closest('aside button')) {
+                  var checkbox = document.getElementById('mobile-sidebar');
+                  if (checkbox) checkbox.checked = false;
+                }
+              }
+            });
+          `,
+        }}
+      />
+
+      <aside className="fixed top-0 left-0 z-[999] flex h-screen w-[220px] min-w-[220px] -translate-x-full flex-col bg-[var(--color-navy)] transition-transform duration-300 ease-in-out peer-checked:translate-x-0 md:translate-x-0">
+        <div className="flex items-center justify-between border-b border-white/10 p-[18px_16px_14px] md:block">
           <div className="flex items-center gap-[10px]">
             <Image
               src="/icon.png"
@@ -89,6 +111,25 @@ export default async function AuthenticatedLayout({
               </span>
             </div>
           </div>
+          {/* Tombol Tutup Silang Khusus Mobile */}
+          <label
+            htmlFor="mobile-sidebar"
+            className="cursor-pointer p-1 text-white/50 hover:text-white md:hidden"
+          >
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </label>
         </div>
 
         <nav className="flex-1 space-y-[2px] overflow-y-auto py-[12px]">
@@ -187,10 +228,38 @@ export default async function AuthenticatedLayout({
         </div>
       </aside>
 
-      <div className="ml-[220px] flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen w-full flex-1 flex-col md:ml-[220px] md:w-auto">
+        {/* 👇 Header Hamburger Khusus Mobile (Tidak mengganggu struktur Topbar Asli) */}
+        <div className="flex items-center justify-between border-b-[1.5px] border-gray-200 bg-white px-[16px] py-[14px] md:hidden">
+          <div className="flex items-center gap-[12px]">
+            <label
+              htmlFor="mobile-sidebar"
+              className="cursor-pointer rounded-[6px] border border-gray-200 bg-gray-50 p-[6px] text-gray-600 shadow-sm hover:bg-gray-100"
+            >
+              <svg
+                className="h-5 w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </label>
+            <span className="text-[14px] font-bold text-[var(--color-navy)]">
+              Menu Navigasi
+            </span>
+          </div>
+        </div>
+
+        {/* Topbar Asli 100% Tidak Disentuh */}
         <Topbar />
 
-        <main className="flex-1 p-[24px]">{children}</main>
+        <main className="flex-1 p-[16px] md:p-[24px]">{children}</main>
       </div>
     </div>
   );
