@@ -8,10 +8,13 @@ export function Topbar() {
   // Pemetaan Judul Topbar berdasarkan sub-path aktif
   const getTopbarTitle = () => {
     if (pathname.startsWith("/app/dashboard")) return "Dashboard Statistik";
-    if (pathname.startsWith("/app/archive")) return "Manajemen Arsip Dokumen";
-    if (pathname.startsWith("/app/system"))
+    else if (pathname.startsWith("/app/archive"))
+      return "Manajemen Arsip Dokumen";
+    else if (pathname.startsWith("/app/retention"))
+      return "Manajemen Retensi Arsip";
+    else if (pathname.startsWith("/app/system"))
       return "Pengaturan Sistem & Master Data";
-    if (pathname.startsWith("/app/backup")) return "Backup & Ekspor Data";
+    else if (pathname.startsWith("/app/backup")) return "Backup & Ekspor Data";
     return "Panel Sistem";
   };
 

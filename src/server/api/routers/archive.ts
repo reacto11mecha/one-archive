@@ -387,4 +387,46 @@ export const archiveRouter = createTRPCRouter({
         downloadUrl,
       };
     }),
+
+  destroyArchive: protectedProcedure
+    .input(z.object({ archiveId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const archive = await ctx.db.query.archives.findFirst({
+        where: eq(schema.archives.id, input.archiveId),
+      });
+
+      if (!archive) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Arsip tidak ditemukan",
+        });
+      }
+
+      // 1. Hapus file fisik dari S3 untuk menghemat storage
+      if (archive.fileKey !== "DESTROYED") {
+        try {
+          await s3Client.send(
+            new DeleteObjectCommand({
+              Bucket: env.STORAGE_BUCKET_NAME,
+              Key: archive.fileKey,
+            }),
+          );
+        } catch (error) {
+          console.error("Gagal menghapus file fisik di S3:", error);
+          // Tetap lanjut ubah status database sebagai bentuk fail-safe
+        }
+      }
+
+      // 2. Ubah status di database menjadi "Dimusnahkan" tanpa menghapus baris metadata
+      await ctx.db
+        .update(schema.archives)
+        .set({
+          retentionStatus: "Dimusnahkan",
+          fileKey: "DESTROYED", // Tandai file key agar tidak bisa diakses/diunduh lagi
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.archives.id, input.archiveId));
+
+      return { success: true };
+    }),
 });

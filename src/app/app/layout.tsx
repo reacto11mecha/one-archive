@@ -114,6 +114,15 @@ export default async function AuthenticatedLayout({
             <>
               <div className="px-[12px]">
                 <Link
+                  href="/app/retention"
+                  className="flex items-center gap-[10px] rounded-[8px] p-[9px_14px] text-[12px] font-medium text-white/70 hover:bg-white/8 hover:text-white"
+                >
+                  <span>🔥 Retensi & JRA</span>
+                </Link>
+              </div>
+
+              <div className="px-[12px]">
+                <Link
                   href="/app/system"
                   className="flex items-center gap-[10px] rounded-[8px] p-[9px_14px] text-[12px] font-medium text-white/70 hover:bg-white/8 hover:text-white"
                 >
