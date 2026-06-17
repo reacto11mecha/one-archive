@@ -6,6 +6,7 @@ import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
 const config = {
+  output: "standalone",
   images: {
     remotePatterns: [new URL("https://lh3.googleusercontent.com/a/**")],
   },
