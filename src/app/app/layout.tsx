@@ -70,13 +70,16 @@ export default async function AuthenticatedLayout({
 
   return (
     <div className="flex min-h-screen bg-[var(--color-off)] font-sans text-[var(--color-text-main)]">
+      {/* Pengontrol Sidebar Mekanisme Checkbox Hack */}
       <input type="checkbox" id="mobile-sidebar" className="peer hidden" />
 
+      {/* Overlay Gelap */}
       <label
         htmlFor="mobile-sidebar"
         className="fixed inset-0 z-[998] hidden cursor-pointer bg-black/50 backdrop-blur-sm peer-checked:block md:hidden"
       ></label>
 
+      {/* Script untuk Menutup Sidebar Otomatis saat Menu Diklik (Khusus Mobile) */}
       <script
         dangerouslySetInnerHTML={{
           __html: `
@@ -92,7 +95,8 @@ export default async function AuthenticatedLayout({
         }}
       />
 
-      <aside className="fixed top-0 left-0 z-[999] flex h-screen w-[220px] min-w-[220px] -translate-x-full flex-col bg-[var(--color-navy)] transition-transform duration-300 ease-in-out peer-checked:translate-x-0 md:translate-x-0">
+      {/* 👇 PERBAIKAN UTAMA: Menggunakan inset-y-0 dan h-[100dvh] untuk mengunci tinggi viewable mobile browser 👇 */}
+      <aside className="fixed inset-y-0 left-0 z-[999] flex h-[100dvh] w-[220px] min-w-[220px] -translate-x-full flex-col bg-[var(--color-navy)] transition-transform duration-300 ease-in-out peer-checked:translate-x-0 md:translate-x-0">
         <div className="flex items-center justify-between border-b border-white/10 p-[18px_16px_14px] md:block">
           <div className="flex items-center gap-[10px]">
             <Image
@@ -183,7 +187,8 @@ export default async function AuthenticatedLayout({
           )}
         </nav>
 
-        <div className="border-t border-white/10 bg-[var(--color-navy3)] p-[12px_16px]">
+        {/* Bagian Identitas User - Terkunci aman di paling bawah karena flexbox container parent berukuran presisi */}
+        <div className="shrink-0 border-t border-white/10 bg-[var(--color-navy3)] p-[12px_16px]">
           <div className="flex items-center gap-[10px]">
             {session.user.image ? (
               <Image
@@ -228,9 +233,10 @@ export default async function AuthenticatedLayout({
         </div>
       </aside>
 
+      {/* Konten Utama */}
       <div className="flex min-h-screen w-full flex-1 flex-col md:ml-[220px] md:w-auto">
-        {/* 👇 Header Hamburger Khusus Mobile (Tidak mengganggu struktur Topbar Asli) */}
-        <div className="flex items-center justify-between border-b-[1.5px] border-gray-200 bg-white px-[16px] py-[14px] md:hidden">
+        {/* Header Hamburger Khusus Mobile */}
+        <div className="flex shrink-0 items-center justify-between border-b-[1.5px] border-gray-200 bg-white px-[16px] py-[14px] md:hidden">
           <div className="flex items-center gap-[12px]">
             <label
               htmlFor="mobile-sidebar"
@@ -256,10 +262,9 @@ export default async function AuthenticatedLayout({
           </div>
         </div>
 
-        {/* Topbar Asli 100% Tidak Disentuh */}
         <Topbar />
 
-        <main className="flex-1 p-[16px] md:p-[24px]">{children}</main>
+        <main className="flex-1 p-[24px]">{children}</main>
       </div>
     </div>
   );

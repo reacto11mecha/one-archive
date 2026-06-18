@@ -1,0 +1,79 @@
+services:
+  # Database Utama
+  postgres:
+    image: postgres:16-alpine
+    container_name: one-archive-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: one-archive
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # SeaweedFS Master
+  master:
+    image: chrislusf/seaweedfs
+    container_name: one-archive-sw-master
+    restart: unless-stopped
+    ports:
+      - "9333:9333"
+      - "19333:19333"
+    command: "master -ip=master -ip.bind=0.0.0.0"
+    volumes:
+      - sw_master_data:/data
+
+  # SeaweedFS Volume
+  volume:
+    image: chrislusf/seaweedfs
+    container_name: one-archive-sw-volume
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "18080:18080"
+    command: 'volume -ip=volume -master="master:9333" -ip.bind=0.0.0.0 -port=8080'
+    depends_on:
+      - master
+    volumes:
+      - sw_volume_data:/data
+
+  # SeaweedFS Filer
+  filer:
+    image: chrislusf/seaweedfs
+    container_name: one-archive-sw-filer
+    restart: unless-stopped
+    ports:
+      - "8888:8888"
+      - "18888:18888"
+    command: 'filer -ip=filer -master="master:9333" -ip.bind=0.0.0.0'
+    tty: true
+    stdin_open: true
+    depends_on:
+      - master
+      - volume
+    volumes:
+      - sw_filer_data:/data
+
+  # SeaweedFS S3 Proxy
+  s3:
+    image: chrislusf/seaweedfs
+    container_name: one-archive-sw-s3
+    restart: unless-stopped
+    ports:
+      - "8333:8333"
+    command: 's3 -filer="filer:8888" -ip.bind=0.0.0.0'
+    environment:
+      - AWS_ACCESS_KEY_ID=onearchiveadmin999
+      - AWS_SECRET_ACCESS_KEY=supersecretdonotshare
+    depends_on:
+      - master
+      - volume
+      - filer
+
+volumes:
+  postgres_data:
+  sw_master_data:
+  sw_volume_data:
+  sw_filer_data:
