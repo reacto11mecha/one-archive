@@ -111,7 +111,7 @@ export const archiveRouter = createTRPCRouter({
     if (isAdmin) {
       archivesList = await ctx.db.query.archives.findMany({
         orderBy: (archives, { desc }) => [desc(archives.createdAt)],
-        with: { shareConfig: true },
+        with: { shareConfig: true, category: true },
       });
     } else if (roleId) {
       const access = await ctx.db.query.roleCategoryAccess.findMany({
@@ -123,7 +123,7 @@ export const archiveRouter = createTRPCRouter({
         archivesList = await ctx.db.query.archives.findMany({
           where: inArray(schema.archives.categoryId, allowedCategoryIds),
           orderBy: (archives, { desc }) => [desc(archives.createdAt)],
-          with: { shareConfig: true },
+          with: { shareConfig: true, category: true },
         });
       } else {
         archivesList = [];

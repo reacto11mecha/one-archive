@@ -118,7 +118,8 @@ export default function RetentionManagementPage() {
                       {arc.title}
                     </span>
                     <span className="mt-1 block text-[11px] text-[var(--color-muted)]">
-                      No: {arc.nomorSurat || "-"} | Kategori: {arc.categoryId}
+                      No: {arc.nomorSurat || "-"} | Kategori:{" "}
+                      {arc.category.icon} {arc.category.name}
                     </span>
                   </td>
                   <td className="p-[14px_16px] align-top text-[12px] font-semibold text-red-600">
