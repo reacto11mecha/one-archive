@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { api } from "~/trpc/react";
 import type { RouterOutputs } from "~/trpc/react";
 import { toast } from "sonner";
@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   flexRender,
   createColumnHelper,
-  SortingState,
+  type SortingState,
 } from "@tanstack/react-table";
 
 type Archive = RouterOutputs["archive"]["getArchives"][number];
@@ -33,7 +33,6 @@ export function ArchiveTable({
 }: ArchiveTableProps) {
   const ctx = api.useUtils();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
 
   const getFileAccessUrlMutation = api.archive.getFileAccessUrl.useMutation();
   const deleteArchiveMutation = api.archive.deleteArchive.useMutation({
@@ -73,40 +72,68 @@ export function ArchiveTable({
     }
   };
 
-  // ==============================================================
-  // 1. INITIAL STATE DARI URL (Hanya dibaca sekali saat mount)
-  // ==============================================================
-  const [searchQuery, setSearchQuery] = useState(
-    () => searchParams.get("q") || "",
-  );
-  const [filterCategory, setFilterCategory] = useState(
-    () => searchParams.get("category") || "",
-  );
-  const [filterType, setFilterType] = useState(
-    () => searchParams.get("type") || "",
-  );
-  const [filterStart, setFilterStart] = useState(
-    () => searchParams.get("start") || "",
-  );
-  const [filterEnd, setFilterEnd] = useState(
-    () => searchParams.get("end") || "",
-  );
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterStart, setFilterStart] = useState("");
+  const [filterEnd, setFilterEnd] = useState("");
 
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState(() => ({
-    pageIndex: Math.max(0, Number(searchParams.get("page") || 1) - 1),
-    pageSize: Number(searchParams.get("size") || 10),
-  }));
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
 
-  // Handler cerdas: Update nilai filter sekaligus reset halaman tabel ke 1
   const updateFilter = (setter: (val: string) => void, value: string) => {
     setter(value);
     setPagination((prev) => ({ ...prev, pageIndex: 0 }));
   };
 
-  // ==============================================================
-  // 2. FILTER ENGINE (Menyaring data sebelum masuk ke Tabel)
-  // ==============================================================
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setSearchQuery(params.get("q") || "");
+      setFilterCategory(params.get("category") || "");
+      setFilterType(params.get("type") || "");
+      setFilterStart(params.get("start") || "");
+      setFilterEnd(params.get("end") || "");
+
+      const p = Number(params.get("page") || 1);
+      const s = Number(params.get("size") || 10);
+      setPagination({
+        pageIndex: Math.max(0, p - 1),
+        pageSize: s,
+      });
+      setIsInitialized(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("q", searchQuery);
+      if (filterCategory) params.set("category", filterCategory);
+      if (filterType) params.set("type", filterType);
+      if (filterStart) params.set("start", filterStart);
+      if (filterEnd) params.set("end", filterEnd);
+      params.set("page", String(pagination.pageIndex + 1));
+      params.set("size", String(pagination.pageSize));
+
+      const newUrl = `${pathname}?${params.toString()}`;
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [
+    searchQuery,
+    filterCategory,
+    filterType,
+    filterStart,
+    filterEnd,
+    pagination,
+    pathname,
+    isInitialized,
+  ]);
+
   const processedData = useMemo(() => {
     if (!archivesList) return [];
     return archivesList.filter((arc) => {
@@ -143,47 +170,19 @@ export function ArchiveTable({
     filterEnd,
   ]);
 
-  // ==============================================================
-  // 3. SINKRONISASI KE URL & PENCEGAHAN BUG PAGE
-  // ==============================================================
-  // Cegah error out-of-bounds jika data hasil filter tinggal sedikit
   useEffect(() => {
+    if (!isInitialized) return;
     const maxPage = Math.ceil(processedData.length / pagination.pageSize);
     if (maxPage > 0 && pagination.pageIndex >= maxPage) {
       setPagination((prev) => ({ ...prev, pageIndex: maxPage - 1 }));
     }
-  }, [processedData.length, pagination.pageSize, pagination.pageIndex]);
-
-  // Update URL Query String secara diam-diam (tanpa render ulang Next.js)
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams();
-      if (searchQuery) params.set("q", searchQuery);
-      if (filterCategory) params.set("category", filterCategory);
-      if (filterType) params.set("type", filterType);
-      if (filterStart) params.set("start", filterStart);
-      if (filterEnd) params.set("end", filterEnd);
-      params.set("page", String(pagination.pageIndex + 1));
-      params.set("size", String(pagination.pageSize));
-
-      const newUrl = `${pathname}?${params.toString()}`;
-      if (window.location.search !== `?${params.toString()}`) {
-        window.history.replaceState(null, "", newUrl);
-      }
-    }
   }, [
-    searchQuery,
-    filterCategory,
-    filterType,
-    filterStart,
-    filterEnd,
-    pagination,
-    pathname,
+    processedData.length,
+    pagination.pageSize,
+    pagination.pageIndex,
+    isInitialized,
   ]);
 
-  // ==============================================================
-  // 4. KONFIGURASI KOLOM TANSTACK
-  // ==============================================================
   const columnHelper = createColumnHelper<Archive>();
   const columns = useMemo(
     () => [
@@ -352,7 +351,6 @@ export function ArchiveTable({
 
   return (
     <div className="space-y-[16px]">
-      {/* KOTAK FILTER & PENCARIAN (Terintegrasi ke dalam Tabel) */}
       <div className="flex flex-col gap-[16px] rounded-[12px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[16px] shadow-sm">
         <div className="w-full">
           <input
@@ -421,7 +419,6 @@ export function ArchiveTable({
         </div>
       </div>
 
-      {/* KOTAK DATA TABEL */}
       <div className="overflow-hidden rounded-[12px] border-[1.5px] border-[var(--color-border-main)] bg-white shadow-[0_2px_12px_rgba(13,27,62,0.12)]">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
@@ -484,7 +481,6 @@ export function ArchiveTable({
         </div>
       </div>
 
-      {/* KONTROL PAGINATION */}
       {processedData.length > 0 && (
         <div className="flex flex-col items-center justify-between gap-4 rounded-[12px] border-[1.5px] border-[var(--color-border-main)] bg-white p-[12px_16px] shadow-sm sm:flex-row">
           <div className="flex flex-wrap items-center gap-[16px]">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { api } from "~/trpc/react";
 import { ArchiveTable } from "~/app/_components/ArchiveTable";
 import { EditModal } from "~/app/_components/EditModal";
@@ -8,6 +9,8 @@ import { ShareModal } from "~/app/_components/ShareModal";
 import { UploadForm } from "~/app/_components/UploadForm";
 
 export default function ArchivePage() {
+  const pathname = usePathname();
+
   const { data: archivesList, isLoading: isArchivesLoading } =
     api.archive.getArchives.useQuery();
   const { data: classification, isLoading: isClassificationLoading } =
@@ -65,7 +68,12 @@ export default function ArchivePage() {
           </div>
           <UploadForm
             classification={classification}
-            onSuccess={() => setIsUploadOpen(false)}
+            onSuccess={() => {
+              if (typeof window !== "undefined") {
+                window.history.replaceState(null, "", pathname);
+              }
+              setIsUploadOpen(false);
+            }}
             onCancel={() => setIsUploadOpen(false)}
           />
         </div>
