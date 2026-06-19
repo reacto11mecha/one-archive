@@ -41,7 +41,7 @@ export function EditModal({ editData, setEditData, onClose }: EditModalProps) {
       createdAt: editData.createdAt ? new Date(editData.createdAt) : undefined,
       retentionDate: editData.retentionDate
         ? new Date(editData.retentionDate)
-        : undefined,
+        : null,
     });
   };
 

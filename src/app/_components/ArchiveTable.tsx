@@ -262,7 +262,7 @@ export function ArchiveTable({
                   <span
                     className={`inline-block rounded-[6px] px-[8px] py-[3px] text-[9px] font-bold tracking-wider uppercase ${isExpired ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}
                   >
-                    {isExpired ? "🔴 Retensi Kedaluwarsa" : "🟢 Retensi Aktif"}
+                    {isExpired ? "🔴 Retensi Inaktif" : "🟢 Retensi Aktif"}
                   </span>
                 ) : (
                   <span className="inline-block rounded-[6px] bg-gray-100 px-[8px] py-[3px] text-[9px] font-bold tracking-wider text-gray-600 uppercase">

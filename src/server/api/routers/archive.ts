@@ -219,7 +219,7 @@ export const archiveRouter = createTRPCRouter({
         description: z.string().optional(),
         nomorSurat: z.string().optional(),
         createdAt: z.date().optional(),
-        retentionDate: z.date().optional(),
+        retentionDate: z.date().nullable().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
